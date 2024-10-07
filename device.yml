@@ -1,0 +1,123 @@
+%YAML 1.1
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/reflex-generator/main/schema/device.json
+device: CurrentDriver
+whoAmI: 1282
+firmwareVersion: "1.0"
+hardwareTargets: "1.0"
+registers:
+  DigitalInputState:
+    address: 32
+    access: Event
+    type: U8
+    maskType: DigitalInputs
+    description: Reflects the state of DI digital lines
+  OutputSet: &output
+    address: 33
+    type: U16
+    access: Write
+    maskType: DigitalOutputs
+    description: Set the specified digital output lines
+  OutputClear:
+    <<: *output
+    address: 34
+    description: Clear the specified digital output lines
+  OutputToggle:
+    <<: *output
+    address: 35
+    description: Toggle the specified digital output lines
+  OutputState:
+    <<: *output
+    address: 36
+    description: Write the state of all digital output lines
+  Led0Current: &ledCurrent
+    address: 37
+    type: Float
+    access: Write
+    minValue: 0
+    maxValue: 1000
+    description: Configuration of current to drive LED 0 [0:1000] mA
+  Led1Current:
+    <<: *ledCurrent
+    address: 38
+    description: Configuration of current to drive LED 1 [0:1000] mA
+  Dac0Voltage: &dacVoltage
+    address: 39
+    type: Float
+    access: Write
+    minValue: 0
+    maxValue: 4000
+    description: Configuration of DAC 0 voltage [0:4000] mV
+  Dac1Voltage:
+    <<: *dacVoltage
+    address: 40
+    description: Configuration of DAC 1 voltage [0:4000] mV
+  LedEnable: &led
+    address: 41
+    type: U8
+    access: Write
+    maskType: LedOutputs
+    description: Enable driver on the selected output
+  LedDisable:
+    <<: *led
+    address: 42
+    description: Disable driver on the selected output
+  LedState:
+    <<: *led
+    address: 43
+    description: Control the correspondent LED output
+  Led0MaxCurrent: &ledMaxCurrent
+    address: 44
+    type: Float
+    access: Write
+    minValue: 0
+    maxValue: 1000
+    description: Configuration of current to drive LED 0 [0:1000] mA
+  Led1MaxCurrent:
+    <<: *ledMaxCurrent
+    address: 45
+    description: Configuration of current to drive LED 1 [0:1000] mA
+  Reserved0: &reserved
+    address: 46
+    access: Read
+    visibility: private
+    type: U8
+    description: Reserved
+  Reserved1:
+    <<: *reserved
+    address: 47
+  Reserved2:
+    <<: *reserved
+    address: 48
+  Reserved3:
+    <<: *reserved
+    address: 49
+  Reserved4:
+    <<: *reserved
+    address: 50
+  EnableEvents:
+    address: 51
+    access: Write
+    type: U8
+    maskType: CurrentDriverEvents
+    description: Specifies the active events in the device
+bitMasks:
+  DigitalInputs:
+    description: Specifies the state of port digital input lines
+    bits:
+      DI0: 0x1
+      DI1: 0x2
+  DigitalOutputs:
+    description: Specifies the state of port digital output lines
+    bits:
+      DO0: 0x1
+      DO1: 0x2
+  LedOutputs:
+    description: Specifies the state of LED driver's outputs
+    bits:
+      LED0: 0x1
+      LED1: 0x2
+  CurrentDriverEvents:
+    description: Specifies the active events in the device.
+    bits:
+      DIs: 0x1
