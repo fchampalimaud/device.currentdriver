@@ -86,8 +86,8 @@ typedef struct
 	uint8_t REG_LED_ENABLE;
 	uint8_t REG_LED_DISABLE;
 	uint8_t REG_LED_OUT;
-	uint8_t REG_LED0_MAX_CURRENT;
-	uint8_t REG_LED1_MAX_CURRENT;
+	float REG_LED0_MAX_CURRENT;
+	float REG_LED1_MAX_CURRENT;
 	uint8_t REG_RESERVED0;
 	uint8_t REG_RESERVED1;
 	uint8_t REG_RESERVED2;
@@ -112,8 +112,8 @@ typedef struct
 #define ADD_REG_LED_ENABLE                  41 // U8     Enable driver on the selected output
 #define ADD_REG_LED_DISABLE                 42 // U8     Disable driver on the selected output
 #define ADD_REG_LED_OUT                     43 // U8     Control the correspondent output
-#define ADD_REG_LED0_MAX_CURRENT            44 // U8     Configuration of current to drive LED 0 [0:1000] mA
-#define ADD_REG_LED1_MAX_CURRENT            45 // U8     Configuration of current to drive LED 1 [0:1000] mA
+#define ADD_REG_LED0_MAX_CURRENT            44 // Float  Configuration of current to drive LED 0 [0:1000] mA
+#define ADD_REG_LED1_MAX_CURRENT            45 // Float  Configuration of current to drive LED 1 [0:1000] mA
 #define ADD_REG_RESERVED0                   46 // U8     Reserved for future use
 #define ADD_REG_RESERVED1                   47 // U8     Reserved for future use
 #define ADD_REG_RESERVED2                   48 // U8     Reserved for future use

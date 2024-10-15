@@ -308,7 +308,7 @@ bool app_write_REG_LED_OUT(void *a)
 void app_read_REG_LED0_MAX_CURRENT(void) {}
 bool app_write_REG_LED0_MAX_CURRENT(void *a)
 {
-	uint8_t reg = *((uint8_t*)a);
+	float reg = *((float*)a);
 
 	if (reg < 1 || reg > 1000)
 	{
@@ -328,7 +328,7 @@ void app_read_REG_LED1_MAX_CURRENT(void) {}
 
 bool app_write_REG_LED1_MAX_CURRENT(void *a)
 {
-	uint8_t reg = *((uint8_t*)a);
+	float reg = *((float*)a);
 	
 	if (reg < 1 || reg > 1000)
 	{
