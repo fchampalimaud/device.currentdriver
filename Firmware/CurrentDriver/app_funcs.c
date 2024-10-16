@@ -150,6 +150,25 @@ bool app_write_REG_OUTPUTS_OUT(void *a)
 uint16_t aux_u16b;
 void latch_dac0(uint16_t word)
 {
+	clr_CS0;
+	aux_u16b = word;
+	
+	// 16 bit code latch
+	SPID_DATA = *(((uint8_t*)(&aux_u16b))+1);
+	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
+
+	SPID_DATA = *(((uint8_t*)(&aux_u16b))+0);
+	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
+
+	set_CS0;
+}
+
+
+/************************************************************************/
+/* LATCH_DAC1                                                           */
+/************************************************************************/
+void latch_dac1(uint16_t word)
+{
 	clr_CS1;
 	aux_u16b = word;
 	
@@ -161,25 +180,6 @@ void latch_dac0(uint16_t word)
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
 	set_CS1;
-}
-
-
-/************************************************************************/
-/* LATCH_DAC1                                                           */
-/************************************************************************/
-void latch_dac1(uint16_t word)
-{
-	clr_CS2;
-	aux_u16b = word;
-	
-	// 16 bit code latch
-	SPID_DATA = *(((uint8_t*)(&aux_u16b))+1);
-	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
-
-	SPID_DATA = *(((uint8_t*)(&aux_u16b))+0);
-	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
-
-	set_CS2;
 }
 
 
@@ -218,7 +218,7 @@ bool app_write_REG_LED1_CURRENT(void *a)
 	}
 	
 	uint16_t daqValue = (uint16_t)(reg / 1000  * 65535);
-	latch_dac0(daqValue);
+	latch_dac1(daqValue);
 
 	app_regs.REG_LED1_CURRENT = reg;
 	return true;

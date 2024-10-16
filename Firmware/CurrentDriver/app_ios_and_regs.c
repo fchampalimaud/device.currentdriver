@@ -10,8 +10,6 @@ void init_ios(void)
 	io_pin2in(&PORTB, 0, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // DI0
 	io_pin2in(&PORTD, 0, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // HOLD0
 	io_pin2in(&PORTD, 1, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // HOLD1
-	io_pin2in(&PORTD, 3, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // CE1
-	io_pin2in(&PORTD, 4, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // CE2
 	io_pin2in(&PORTD, 6, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // MISO
 	io_pin2in(&PORTH, 0, PULL_IO_UP, SENSE_IO_EDGES_BOTH);               // DI1
 
@@ -19,13 +17,15 @@ void init_ios(void)
 	io_set_int(&PORTB, INT_LEVEL_LOW, 0, (1<<0), false);                 // DI0
 	io_set_int(&PORTD, INT_LEVEL_LOW, 0, (1<<0), false);                 // HOLD0
 	io_set_int(&PORTD, INT_LEVEL_LOW, 0, (1<<1), false);                 // HOLD1
-	io_set_int(&PORTD, INT_LEVEL_LOW, 0, (1<<3), false);                 // CE1
-	io_set_int(&PORTD, INT_LEVEL_LOW, 0, (1<<4), false);                 // CE2
 	io_set_int(&PORTH, INT_LEVEL_LOW, 0, (1<<0), false);                 // DI1
 
 	/* Configure output pins */
 	io_pin2out(&PORTB, 5, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // I_OFF_DAC0
 	io_pin2out(&PORTB, 6, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // I_OFF_DAC1
+	io_pin2out(&PORTD, 3, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CE1
+	io_pin2out(&PORTD, 4, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CE2
+	io_pin2out(&PORTF, 5, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CS0
+	io_pin2out(&PORTF, 6, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CS1
 	io_pin2out(&PORTD, 5, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // MOSI
 	io_pin2out(&PORTD, 7, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // SCK
 	io_pin2out(&PORTE, 0, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // DO1
@@ -34,6 +34,10 @@ void init_ios(void)
 	/* Initialize output pins */
 	clr_I_OFF_DAC0;
 	clr_I_OFF_DAC1;
+	set_CE1;
+	set_CE2;
+	set_CS0;
+	set_CS1;
 	clr_MOSI;
 	clr_SCK;
 	clr_DO1;
@@ -58,8 +62,8 @@ uint8_t app_regs_type[] = {
 	TYPE_U8,
 	TYPE_U8,
 	TYPE_U8,
-	TYPE_U8,
-	TYPE_U8,
+	TYPE_FLOAT,
+	TYPE_FLOAT,
 	TYPE_U8,
 	TYPE_U8,
 	TYPE_U8,

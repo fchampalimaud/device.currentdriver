@@ -23,8 +23,10 @@ void init_ios(void);
 /************************************************************************/
 // I_OFF_DAC0             Description: Disable DAC0 current
 // I_OFF_DAC1             Description: Disable DAC1 current
+// CE1                    Description: Chip enable 1 (active low)
+// CE2                    Description: Chip enable 2 (active low)
+// CS0                    Description: Chip select 0 (active low)
 // CS1                    Description: Chip select 1 (active low)
-// CS2                    Description: Chip select 2 (active low)
 // MOSI                   Description: MOSI
 // SCK                    Description: SCK
 // DO1                    Description: Output DO1
@@ -43,17 +45,29 @@ void init_ios(void);
 #define tgl_I_OFF_DAC1 toggle_io(PORTB, 6)
 #define read_I_OFF_DAC1 read_io(PORTB, 6)
 
-/* CS1 */
-#define set_CS1 set_io(PORTD, 3)
-#define clr_CS1 clear_io(PORTD, 3)
-#define tgl_CS1 toggle_io(PORTD, 3)
-#define read_CS1 read_io(PORTD, 3)
+/* CE1 */
+#define set_CE1 set_io(PORTD, 3)
+#define clr_CE1 clear_io(PORTD, 3)
+#define tgl_CE1 toggle_io(PORTD, 3)
+#define read_CE1 read_io(PORTD, 3)
 
-/* CS2 */
-#define set_CS2 set_io(PORTD, 4)
-#define clr_CS2 clear_io(PORTD, 4)
-#define tgl_CS2 toggle_io(PORTD, 4)
-#define read_CS2 read_io(PORTD, 4)
+/* CE2 */
+#define set_CE2 set_io(PORTD, 4)
+#define clr_CE2 clear_io(PORTD, 4)
+#define tgl_CE2 toggle_io(PORTD, 4)
+#define read_CE2 read_io(PORTD, 4)
+
+/* CS0 */
+#define set_CS0 set_io(PORTF, 5)
+#define clr_CS0 clear_io(PORTF, 5)
+#define tgl_CS0 toggle_io(PORTF, 5)
+#define read_CS0 read_io(PORTF, 5)
+
+/* CS1 */
+#define set_CS1 set_io(PORTF, 6)
+#define clr_CS1 clear_io(PORTF, 6)
+#define tgl_CS1 toggle_io(PORTF, 6)
+#define read_CS1 read_io(PORTF, 6)
 
 /* MOSI */
 #define set_MOSI set_io(PORTD, 5)
@@ -141,7 +155,7 @@ typedef struct
 /* Memory limits */
 #define APP_REGS_ADD_MIN                    0x20
 #define APP_REGS_ADD_MAX                    0x33
-#define APP_NBYTES_OF_REG_BANK              20
+#define APP_NBYTES_OF_REG_BANK              42
 
 /************************************************************************/
 /* Registers' bits                                                      */
