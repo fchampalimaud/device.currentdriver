@@ -46,12 +46,12 @@ registers:
     type: Float
     access: Write
     minValue: 0
-    maxValue: 4000
-    description: Configuration of DAC 0 voltage [0:4000] mV
+    maxValue: 5000
+    description: Configuration of DAC 0 voltage [0:5000] mV
   Dac1Voltage:
     <<: *dacVoltage
     address: 40
-    description: Configuration of DAC 1 voltage [0:4000] mV
+    description: Configuration of DAC 1 voltage [0:5000] mV
   LedEnable: &led
     address: 41
     type: U8

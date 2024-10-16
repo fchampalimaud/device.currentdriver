@@ -145,27 +145,47 @@ bool app_write_REG_OUTPUTS_OUT(void *a)
 
 
 /************************************************************************/
-/* REG_LED0_CURRENT                                                     */
+/* LATCH_DAC0                                                           */
 /************************************************************************/
-uint16_t dummy_u16b;
-void load_dac(uint16_t word, int pin)
+uint16_t aux_u16b;
+void latch_dac0(uint16_t word)
 {
-	// Turn off CE?
-	clear_io(PORTD, pin);
+	clr_CS1;
+	aux_u16b = word;
 	
-	dummy_u16b = word;
-	
-	// Sends one byte
-	SPID_DATA = *(((uint8_t*)(&dummy_u16b))+1);
+	// 16 bit code latch
+	SPID_DATA = *(((uint8_t*)(&aux_u16b))+1);
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
-	// Sends the other byte
-	SPID_DATA = *(((uint8_t*)(&dummy_u16b))+0);
+	SPID_DATA = *(((uint8_t*)(&aux_u16b))+0);
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
-	// Shouldn't I turn on the CE again?
+	set_CS1;
 }
 
+
+/************************************************************************/
+/* LATCH_DAC1                                                           */
+/************************************************************************/
+void latch_dac1(uint16_t word)
+{
+	clr_CS2;
+	aux_u16b = word;
+	
+	// 16 bit code latch
+	SPID_DATA = *(((uint8_t*)(&aux_u16b))+1);
+	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
+
+	SPID_DATA = *(((uint8_t*)(&aux_u16b))+0);
+	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
+
+	set_CS2;
+}
+
+
+/************************************************************************/
+/* REG_LED0_CURRENT                                                     */
+/************************************************************************/
 void app_read_REG_LED0_CURRENT(void) {}
 bool app_write_REG_LED0_CURRENT(void *a)
 {
@@ -177,7 +197,7 @@ bool app_write_REG_LED0_CURRENT(void *a)
 	}
 
 	uint16_t daqValue = (uint16_t)(reg / 1000  * 65535);
-	load_dac(daqValue, 3);
+	latch_dac0(daqValue);
 
 	app_regs.REG_LED0_CURRENT = reg;
 	return true;
@@ -198,7 +218,7 @@ bool app_write_REG_LED1_CURRENT(void *a)
 	}
 	
 	uint16_t daqValue = (uint16_t)(reg / 1000  * 65535);
-	load_dac(daqValue, 4);
+	latch_dac0(daqValue);
 
 	app_regs.REG_LED1_CURRENT = reg;
 	return true;
@@ -213,13 +233,13 @@ bool app_write_REG_DAC0_VOLTAGE(void *a)
 {
 	float reg = *((float*)a);
 
-	if (reg < 0 || reg > 4000)
+	if (reg < 0 || reg > 5000)
 	{
 		return false;
 	}
 
-	uint16_t daqValue = (uint16_t)(reg / 4000  * 65535);
-	load_dac(daqValue, 3);
+	uint16_t daqValue = (uint16_t)(reg / 5000  * 65535);
+	latch_dac0(daqValue);
 
 	app_regs.REG_DAC0_VOLTAGE = reg;
 	return true;
@@ -234,13 +254,13 @@ bool app_write_REG_DAC1_VOLTAGE(void *a)
 {
 	float reg = *((float*)a);
 
-	if (reg < 0 || reg > 4000)
+	if (reg < 0 || reg > 5000)
 	{
 		return false;
 	}
 
-	uint16_t daqValue = (uint16_t)(reg / 4000  * 65535);
-	load_dac(daqValue, 4);
+	uint16_t daqValue = (uint16_t)(reg / 5000  * 65535);
+	latch_dac1(daqValue);
 
 	app_regs.REG_DAC1_VOLTAGE = reg;
 	return true;

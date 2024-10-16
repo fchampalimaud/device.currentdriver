@@ -28,8 +28,8 @@ void hwbp_app_initialize(void)
     /* Define versions */
     uint8_t hwH = 1;
     uint8_t hwL = 0;
-    uint8_t fwH = 1;
-    uint8_t fwL = 0;
+    uint8_t fwH = 0;
+    uint8_t fwL = 1;
     uint8_t ass = 0;
     
    	/* Start core */
@@ -53,6 +53,10 @@ void hwbp_app_initialize(void)
 /************************************************************************/
 void core_callback_catastrophic_error_detected(void)
 {
+	set_I_OFF_DAC0;
+	set_I_OFF_DAC1;
+	clr_DO1;
+	clr_DO0;
 	
 }
 
@@ -71,6 +75,12 @@ void core_callback_initialize_hardware(void){
 	init_ios();
 	
 	
+	/* Initialize SPI with 4MHz */
+	SPID_CTRL = SPI_MASTER_bm | SPI_ENABLE_bm | SPI_MODE_0_gc | SPI_CLK2X_bm | SPI_PRESCALER_DIV16_gc;
+		
+
+	
+	
 }				 
 void core_callback_1st_config_hw_after_boot(void)
 {
@@ -78,13 +88,28 @@ void core_callback_1st_config_hw_after_boot(void)
 	/* Don't delete this function!!! */
 	init_ios();
 	
-	/* Initialize hardware */
+	/* Initialize SPI with 4MHz */
+	SPID_CTRL = SPI_MASTER_bm | SPI_ENABLE_bm | SPI_MODE_0_gc | SPI_CLK2X_bm | SPI_PRESCALER_DIV16_gc;
 	
 }
 
 void core_callback_reset_registers(void)
 {
 	/* Initialize registers */
+	app_regs.REG_DAC0_VOLTAGE = 0;
+	app_regs.REG_DAC1_VOLTAGE = 0;
+	app_regs.REG_LED0_CURRENT = 0;
+	app_regs.REG_LED1_CURRENT = 0;
+	app_regs.REG_LED0_MAX_CURRENT = 100;
+	app_regs.REG_LED1_MAX_CURRENT = 100;
+	app_regs.REG_LED_DISABLE = 0;
+	app_regs.REG_LED_ENABLE = 0;
+	app_regs.REG_LED_OUT = 0;
+	app_regs.REG_OUTPUTS_SET = 0;
+	app_regs.REG_OUTPUTS_CLEAR = 0;
+	app_regs.REG_OUTPUTS_TOGGLE = 0;
+	app_regs.REG_OUTPUTS_OUT = 0;
+	app_regs.REG_EVNT_ENABLE = B_EVT_PORT_DIS;
 	
 }
 

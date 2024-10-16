@@ -9,16 +9,12 @@ void init_ios(void);
 // DI0                    Description: Digital input 0
 // HOLD0                  Description: Memory 0 hold (active low)
 // HOLD1                  Description: Memory 1 hold (active low)
-// CE1                    Description: Chip enable 1 (active low)
-// CE2                    Description: Chip enable 2 (active low)
 // MISO                   Description: MISO
 // DI1                    Description: Digital input 1
 
 #define read_DI0 read_io(PORTB, 0)              // DI0
 #define read_HOLD0 read_io(PORTD, 0)            // HOLD0
 #define read_HOLD1 read_io(PORTD, 1)            // HOLD1
-#define read_CE1 read_io(PORTD, 3)              // CE1
-#define read_CE2 read_io(PORTD, 4)              // CE2
 #define read_MISO read_io(PORTD, 6)             // MISO
 #define read_DI1 read_io(PORTH, 0)              // DI1
 
@@ -27,10 +23,13 @@ void init_ios(void);
 /************************************************************************/
 // I_OFF_DAC0             Description: Disable DAC0 current
 // I_OFF_DAC1             Description: Disable DAC1 current
+// CS1                    Description: Chip select 1 (active low)
+// CS2                    Description: Chip select 2 (active low)
 // MOSI                   Description: MOSI
 // SCK                    Description: SCK
 // DO1                    Description: Output DO1
 // DO0                    Description: Output DO0
+
 
 /* I_OFF_DAC0 */
 #define set_I_OFF_DAC0 set_io(PORTB, 5)
@@ -43,6 +42,18 @@ void init_ios(void);
 #define clr_I_OFF_DAC1 clear_io(PORTB, 6)
 #define tgl_I_OFF_DAC1 toggle_io(PORTB, 6)
 #define read_I_OFF_DAC1 read_io(PORTB, 6)
+
+/* CS1 */
+#define set_CS1 set_io(PORTD, 3)
+#define clr_CS1 clear_io(PORTD, 3)
+#define tgl_CS1 toggle_io(PORTD, 3)
+#define read_CS1 read_io(PORTD, 3)
+
+/* CS2 */
+#define set_CS2 set_io(PORTD, 4)
+#define clr_CS2 clear_io(PORTD, 4)
+#define tgl_CS2 toggle_io(PORTD, 4)
+#define read_CS2 read_io(PORTD, 4)
 
 /* MOSI */
 #define set_MOSI set_io(PORTD, 5)
@@ -107,8 +118,8 @@ typedef struct
 #define ADD_REG_OUTPUTS_OUT                 36 // U16    Control the correspondent output
 #define ADD_REG_LED0_CURRENT                37 // Float  Configuration of current to drive LED 0 [0:1000] mA
 #define ADD_REG_LED1_CURRENT                38 // Float  Configuration of current to drive LED 1 [0:1000] mA
-#define ADD_REG_DAC0_VOLTAGE                39 // Float  Configuration of DAC 0 voltage [0:4000] mV
-#define ADD_REG_DAC1_VOLTAGE                40 // Float  Configuration of DAC 1 voltage [0:4000] mV
+#define ADD_REG_DAC0_VOLTAGE                39 // Float  Configuration of DAC 0 voltage [0:5000] mV
+#define ADD_REG_DAC1_VOLTAGE                40 // Float  Configuration of DAC 1 voltage [0:5000] mV
 #define ADD_REG_LED_ENABLE                  41 // U8     Enable driver on the selected output
 #define ADD_REG_LED_DISABLE                 42 // U8     Disable driver on the selected output
 #define ADD_REG_LED_OUT                     43 // U8     Control the correspondent output
