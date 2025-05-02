@@ -27,9 +27,9 @@ void hwbp_app_initialize(void)
 {
     /* Define versions */
     uint8_t hwH = 1;
-    uint8_t hwL = 0;
+    uint8_t hwL = 1;
     uint8_t fwH = 0;
-    uint8_t fwL = 2;
+    uint8_t fwL = 3;
     uint8_t ass = 0;
     
    	/* Start core */
@@ -109,6 +109,13 @@ void core_callback_reset_registers(void)
 	app_regs.REG_OUTPUTS_CLEAR = 0;
 	app_regs.REG_OUTPUTS_TOGGLE = 0;
 	app_regs.REG_OUTPUTS_OUT = 0;
+	app_regs.REG_PULSE_ENABLE = 0;
+	app_regs.REG_PULSE_DURATION_LED0 = 0;
+	app_regs.REG_PULSE_DURATION_LED1 = 0;
+	app_regs.REG_PULSE_FREQUENCY_LED0 = 0;
+	app_regs.REG_PULSE_FREQUENCY_LED1 = 0;
+	app_regs.REG_REG_RAMP_LED0 = 0;
+	app_regs.REG_REG_RAMP_LED1 = 0;
 	app_regs.REG_EVNT_ENABLE = B_EVT_PORT_DIS;
 	
 }

@@ -23,6 +23,13 @@ void (*app_func_rd_pointer[])(void) = {
 	&app_read_REG_LED_OUT,
 	&app_read_REG_LED0_MAX_CURRENT,
 	&app_read_REG_LED1_MAX_CURRENT,
+	&app_read_REG_PULSE_ENABLE,
+	&app_read_REG_PULSE_DURATION_LED0,
+	&app_read_REG_PULSE_DURATION_LED1,
+	&app_read_REG_PULSE_FREQUENCY_LED0,
+	&app_read_REG_PULSE_FREQUENCY_LED1,
+	&app_read_REG_RAMP_LED0,
+	&app_read_REG_RAMP_LED1,
 	&app_read_REG_RESERVED0,
 	&app_read_REG_RESERVED1,
 	&app_read_REG_RESERVED2,
@@ -46,6 +53,13 @@ bool (*app_func_wr_pointer[])(void*) = {
 	&app_write_REG_LED_OUT,
 	&app_write_REG_LED0_MAX_CURRENT,
 	&app_write_REG_LED1_MAX_CURRENT,
+	&app_write_REG_PULSE_ENABLE,
+	&app_write_REG_PULSE_DURATION_LED0,
+	&app_write_REG_PULSE_DURATION_LED1,
+	&app_write_REG_PULSE_FREQUENCY_LED0,
+	&app_write_REG_PULSE_FREQUENCY_LED1,
+	&app_write_REG_RAMP_LED0,
+	&app_write_REG_RAMP_LED1,
 	&app_write_REG_RESERVED0,
 	&app_write_REG_RESERVED1,
 	&app_write_REG_RESERVED2,
@@ -357,6 +371,132 @@ bool app_write_REG_LED1_MAX_CURRENT(void *a)
 
 	app_regs.REG_LED1_MAX_CURRENT = reg;
 	
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PULSE_ENABLE                                                     */
+/************************************************************************/
+void app_read_REG_PULSE_ENABLE(void)
+{
+	//app_regs.REG_PULSE_ENABLE = 0;
+
+}
+
+bool app_write_REG_PULSE_ENABLE(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_PULSE_ENABLE = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PULSE_DURATION_LED0                                              */
+/************************************************************************/
+void app_read_REG_PULSE_DURATION_LED0(void)
+{
+	//app_regs.REG_PULSE_DURATION_LED0 = 0;
+
+}
+
+bool app_write_REG_PULSE_DURATION_LED0(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_PULSE_DURATION_LED0 = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PULSE_DURATION_LED1                                              */
+/************************************************************************/
+void app_read_REG_PULSE_DURATION_LED1(void)
+{
+	//app_regs.REG_PULSE_DURATION_LED1 = 0;
+
+}
+
+bool app_write_REG_PULSE_DURATION_LED1(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_PULSE_DURATION_LED1 = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PULSE_FREQUENCY_LED0                                             */
+/************************************************************************/
+void app_read_REG_PULSE_FREQUENCY_LED0(void)
+{
+	//app_regs.REG_PULSE_FREQUENCY_LED0 = 0;
+
+}
+
+bool app_write_REG_PULSE_FREQUENCY_LED0(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_PULSE_FREQUENCY_LED0 = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PULSE_FREQUENCY_LED1                                             */
+/************************************************************************/
+void app_read_REG_PULSE_FREQUENCY_LED1(void)
+{
+	//app_regs.REG_PULSE_FREQUENCY_LED1 = 0;
+
+}
+
+bool app_write_REG_PULSE_FREQUENCY_LED1(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_PULSE_FREQUENCY_LED1 = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_RAMP_LED0                                                        */
+/************************************************************************/
+void app_read_REG_RAMP_LED0(void)
+{
+	//app_regs.REG_RAMP_LED0 = 0;
+
+}
+
+bool app_write_REG_RAMP_LED0(void *a)
+{
+	uint16_t reg = *((uint16_t*)a);
+
+	app_regs.REG_RAMP_LED0 = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_RAMP_LED1                                                        */
+/************************************************************************/
+void app_read_REG_RAMP_LED1(void)
+{
+	//app_regs.REG_RAMP_LED1 = 0;
+
+}
+
+bool app_write_REG_RAMP_LED1(void *a)
+{
+	uint16_t reg = *((uint16_t*)a);
+
+	app_regs.REG_RAMP_LED1 = reg;
 	return true;
 }
 
