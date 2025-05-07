@@ -169,7 +169,70 @@ void core_callback_device_to_speed(void) {}
 void core_callback_t_before_exec(void) {}
 void core_callback_t_after_exec(void) {}
 void core_callback_t_new_second(void) {}
-void core_callback_t_500us(void) {}
+void core_callback_t_500us(void) 
+{
+	if (pulse_countdown.dac0 > 0)
+	    if (--pulse_countdown.dac0 == 0)
+	    {
+    	    if (pwm.dac0)
+    	    {
+				if (timings.is_on_dac0)
+				{
+					pulse_countdown.dac0 = timings.pwm_off_dac0;
+					timings.is_on_dac0 = false;
+					latch_dac0(0);
+				} else {
+					pulse_countdown.dac0 = timings.pwm_on_dac0;
+					timings.is_on_dac0 = true;
+					latch_dac0((uint16_t)(app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
+				}
+    	    }
+	    }
+
+	if (pulse_countdown.dac1 > 0)
+	    if (--pulse_countdown.dac1 == 0)
+	    {
+    	    if (pwm.dac1)
+    	    {
+				if (timings.is_on_dac1)
+				{
+					pulse_countdown.dac1 = timings.pwm_off_dac1;
+					timings.is_on_dac1 = false;
+					latch_dac1(0);
+				} else {
+					pulse_countdown.dac1 = timings.pwm_on_dac1;
+					timings.is_on_dac1 = true;
+					latch_dac1((uint16_t)(app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
+				}
+    	    }
+	    }
+
+	if (pulse_countdown.ramp_dac0 > 0)
+	{
+		pulse_countdown.ramp_dac0--;
+		if (ramp.is_increasing_dac0)
+		{
+			ramp.previous_value_dac0 += ramp.cycle_amount_dac0;
+    	    latch_dac0(ramp.previous_value_dac0);
+		} else {
+			ramp.previous_value_dac0 -= ramp.cycle_amount_dac0;
+    	    latch_dac0(ramp.previous_value_dac0);
+		}
+	}
+
+	if (pulse_countdown.ramp_dac1 > 0)
+	{
+		pulse_countdown.ramp_dac1--;
+		if (ramp.is_increasing_dac1)
+		{
+			ramp.previous_value_dac1 += ramp.cycle_amount_dac1;
+    	    latch_dac1(ramp.previous_value_dac1);
+		} else {
+			ramp.previous_value_dac1 -= ramp.cycle_amount_dac1;
+    	    latch_dac1(ramp.previous_value_dac1);
+		}
+	}
+}
 void core_callback_t_1ms(void) {}
 
 
