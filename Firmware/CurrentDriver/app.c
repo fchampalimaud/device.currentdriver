@@ -6,6 +6,8 @@
 #include "app_funcs.h"
 #include "app_ios_and_regs.h"
 
+#include "structs.h"
+
 #define F_CPU 32000000 //need to be defined for delay.h
 #include <util/delay.h>												   
 /************************************************************************/
@@ -61,6 +63,13 @@ void core_callback_catastrophic_error_detected(void)
 }
 
 /************************************************************************/
+/* General definitions                                                  */
+/************************************************************************/
+countdown_t pulse_countdown;
+pulse_timings timings;
+ramp_info ramp;
+
+/************************************************************************/
 /* User functions                                                       */
 /************************************************************************/
 /* Add your functions here or load external functions if needed */
@@ -110,19 +119,24 @@ void core_callback_reset_registers(void)
 	app_regs.REG_OUTPUTS_TOGGLE = 0;
 	app_regs.REG_OUTPUTS_OUT = 0;
 	app_regs.REG_PULSE_ENABLE = 0;
-	app_regs.REG_PULSE_DURATION_LED0 = 0;
-	app_regs.REG_PULSE_DURATION_LED1 = 0;
-	app_regs.REG_PULSE_FREQUENCY_LED0 = 0;
-	app_regs.REG_PULSE_FREQUENCY_LED1 = 0;
-	app_regs.REG_REG_RAMP_LED0 = 0;
-	app_regs.REG_REG_RAMP_LED1 = 0;
+	app_regs.REG_PULSE_DCYCLE_LED0 = 1;
+	app_regs.REG_PULSE_DCYCLE_LED1 = 1;
+	app_regs.REG_PULSE_FREQUENCY_LED0 = 1;
+	app_regs.REG_PULSE_FREQUENCY_LED1 = 1;
+	app_regs.REG_RAMP_LED0 = 1;
+	app_regs.REG_RAMP_LED1 = 1;
+	app_regs.REG_RAMP_CONFIG = 1;
 	app_regs.REG_EVNT_ENABLE = B_EVT_PORT_DIS;
 	
 }
 
+extern pwm_possibilities_t pwm;
+
 void core_callback_registers_were_reinitialized(void)
 {
-	/* Update registers if needed */
+	pwm.dac0 = false;
+    pwm.dac1 = false;
+    // pwm.do0 = false;
 	
 }
 

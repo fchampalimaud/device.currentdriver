@@ -2,6 +2,19 @@
 #include "app_ios_and_regs.h"
 #include "hwbp_core.h"
 
+#define F_CPU 32000000
+#include <util/delay.h>
+
+#include "structs.h"
+
+extern countdown_t pulse_countdown;
+extern pulse_timings timings;
+extern ramp_info ramp;
+
+extern timer_conf_t timer_conf;
+extern is_new_timer_conf_t is_new_timer_conf;
+
+pwm_possibilities_t pwm;
 
 /************************************************************************/
 /* Create pointers to functions                                         */
@@ -24,17 +37,17 @@ void (*app_func_rd_pointer[])(void) = {
 	&app_read_REG_LED0_MAX_CURRENT,
 	&app_read_REG_LED1_MAX_CURRENT,
 	&app_read_REG_PULSE_ENABLE,
-	&app_read_REG_PULSE_DURATION_LED0,
-	&app_read_REG_PULSE_DURATION_LED1,
+	&app_read_REG_PULSE_DCYCLE_LED0,
+	&app_read_REG_PULSE_DCYCLE_LED1,
 	&app_read_REG_PULSE_FREQUENCY_LED0,
 	&app_read_REG_PULSE_FREQUENCY_LED1,
 	&app_read_REG_RAMP_LED0,
 	&app_read_REG_RAMP_LED1,
+	&app_read_REG_RAMP_CONFIG,
 	&app_read_REG_RESERVED0,
 	&app_read_REG_RESERVED1,
 	&app_read_REG_RESERVED2,
 	&app_read_REG_RESERVED3,
-	&app_read_REG_RESERVED4,
 	&app_read_REG_EVNT_ENABLE
 };
 
@@ -54,17 +67,17 @@ bool (*app_func_wr_pointer[])(void*) = {
 	&app_write_REG_LED0_MAX_CURRENT,
 	&app_write_REG_LED1_MAX_CURRENT,
 	&app_write_REG_PULSE_ENABLE,
-	&app_write_REG_PULSE_DURATION_LED0,
-	&app_write_REG_PULSE_DURATION_LED1,
+	&app_write_REG_PULSE_DCYCLE_LED0,
+	&app_write_REG_PULSE_DCYCLE_LED1,
 	&app_write_REG_PULSE_FREQUENCY_LED0,
 	&app_write_REG_PULSE_FREQUENCY_LED1,
 	&app_write_REG_RAMP_LED0,
 	&app_write_REG_RAMP_LED1,
+	&app_write_REG_RAMP_CONFIG,
 	&app_write_REG_RESERVED0,
 	&app_write_REG_RESERVED1,
 	&app_write_REG_RESERVED2,
 	&app_write_REG_RESERVED3,
-	&app_write_REG_RESERVED4,
 	&app_write_REG_EVNT_ENABLE
 };
 
@@ -84,7 +97,6 @@ bool app_write_REG_PORT_DIS(void *a) { return false; }
 /************************************************************************/
 /* REG_OUTPUTS_SET                                                      */
 /************************************************************************/
-
 void app_read_REG_OUTPUTS_SET(void) {}
 bool app_write_REG_OUTPUTS_SET(void *a)
 {
@@ -200,6 +212,7 @@ void latch_dac1(uint16_t word)
 /************************************************************************/
 /* REG_LED0_CURRENT                                                     */
 /************************************************************************/
+// TODO: IMPLEMENT RAMP AND PULSES
 void app_read_REG_LED0_CURRENT(void) {}
 bool app_write_REG_LED0_CURRENT(void *a)
 {
@@ -221,6 +234,7 @@ bool app_write_REG_LED0_CURRENT(void *a)
 /************************************************************************/
 /* REG_LED1_CURRENT                                                     */
 /************************************************************************/
+// TODO: IMPLEMENT RAMP AND PULSES
 void app_read_REG_LED1_CURRENT(void) {}
 bool app_write_REG_LED1_CURRENT(void *a)
 {
@@ -359,7 +373,6 @@ bool app_write_REG_LED0_MAX_CURRENT(void *a)
 /* REG_LED1_MAX_CURRENT                                                 */
 /************************************************************************/
 void app_read_REG_LED1_MAX_CURRENT(void) {}
-
 bool app_write_REG_LED1_MAX_CURRENT(void *a)
 {
 	float reg = *((float*)a);
@@ -378,12 +391,7 @@ bool app_write_REG_LED1_MAX_CURRENT(void *a)
 /************************************************************************/
 /* REG_PULSE_ENABLE                                                     */
 /************************************************************************/
-void app_read_REG_PULSE_ENABLE(void)
-{
-	//app_regs.REG_PULSE_ENABLE = 0;
-
-}
-
+void app_read_REG_PULSE_ENABLE(void) {}
 bool app_write_REG_PULSE_ENABLE(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
@@ -394,15 +402,10 @@ bool app_write_REG_PULSE_ENABLE(void *a)
 
 
 /************************************************************************/
-/* REG_PULSE_DURATION_LED0                                              */
+/* REG_PULSE_DCYCLE_LED0                                              */
 /************************************************************************/
-void app_read_REG_PULSE_DURATION_LED0(void)
-{
-	//app_regs.REG_PULSE_DURATION_LED0 = 0;
-
-}
-
-bool app_write_REG_PULSE_DURATION_LED0(void *a)
+void app_read_REG_PULSE_DCYCLE_LED0(void) {}
+bool app_write_REG_PULSE_DCYCLE_LED0(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
@@ -412,15 +415,10 @@ bool app_write_REG_PULSE_DURATION_LED0(void *a)
 
 
 /************************************************************************/
-/* REG_PULSE_DURATION_LED1                                              */
+/* REG_PULSE_DCYCLE_LED1                                              */
 /************************************************************************/
-void app_read_REG_PULSE_DURATION_LED1(void)
-{
-	//app_regs.REG_PULSE_DURATION_LED1 = 0;
-
-}
-
-bool app_write_REG_PULSE_DURATION_LED1(void *a)
+void app_read_REG_PULSE_DCYCLE_LED1(void) {}
+bool app_write_REG_PULSE_DCYCLE_LED1(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
@@ -432,12 +430,7 @@ bool app_write_REG_PULSE_DURATION_LED1(void *a)
 /************************************************************************/
 /* REG_PULSE_FREQUENCY_LED0                                             */
 /************************************************************************/
-void app_read_REG_PULSE_FREQUENCY_LED0(void)
-{
-	//app_regs.REG_PULSE_FREQUENCY_LED0 = 0;
-
-}
-
+void app_read_REG_PULSE_FREQUENCY_LED0(void){}
 bool app_write_REG_PULSE_FREQUENCY_LED0(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
@@ -450,12 +443,7 @@ bool app_write_REG_PULSE_FREQUENCY_LED0(void *a)
 /************************************************************************/
 /* REG_PULSE_FREQUENCY_LED1                                             */
 /************************************************************************/
-void app_read_REG_PULSE_FREQUENCY_LED1(void)
-{
-	//app_regs.REG_PULSE_FREQUENCY_LED1 = 0;
-
-}
-
+void app_read_REG_PULSE_FREQUENCY_LED1(void){}
 bool app_write_REG_PULSE_FREQUENCY_LED1(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
@@ -468,12 +456,7 @@ bool app_write_REG_PULSE_FREQUENCY_LED1(void *a)
 /************************************************************************/
 /* REG_RAMP_LED0                                                        */
 /************************************************************************/
-void app_read_REG_RAMP_LED0(void)
-{
-	//app_regs.REG_RAMP_LED0 = 0;
-
-}
-
+void app_read_REG_RAMP_LED0(void) {}
 bool app_write_REG_RAMP_LED0(void *a)
 {
 	uint16_t reg = *((uint16_t*)a);
@@ -486,17 +469,25 @@ bool app_write_REG_RAMP_LED0(void *a)
 /************************************************************************/
 /* REG_RAMP_LED1                                                        */
 /************************************************************************/
-void app_read_REG_RAMP_LED1(void)
-{
-	//app_regs.REG_RAMP_LED1 = 0;
-
-}
-
+void app_read_REG_RAMP_LED1(void) {}
 bool app_write_REG_RAMP_LED1(void *a)
 {
 	uint16_t reg = *((uint16_t*)a);
 
 	app_regs.REG_RAMP_LED1 = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_RAMP_CONFIG                                                      */
+/************************************************************************/
+void app_read_REG_RAMP_CONFIG(void) {}
+bool app_write_REG_RAMP_CONFIG(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_RAMP_CONFIG = reg;
 	return true;
 }
 
@@ -569,24 +560,6 @@ bool app_write_REG_RESERVED3(void *a)
 	uint8_t reg = *((uint8_t*)a);
 
 	app_regs.REG_RESERVED3 = reg;
-	return true;
-}
-
-
-/************************************************************************/
-/* REG_RESERVED4                                                        */
-/************************************************************************/
-void app_read_REG_RESERVED4(void)
-{
-	//app_regs.REG_RESERVED4 = 0;
-
-}
-
-bool app_write_REG_RESERVED4(void *a)
-{
-	uint8_t reg = *((uint8_t*)a);
-
-	app_regs.REG_RESERVED4 = reg;
 	return true;
 }
 
