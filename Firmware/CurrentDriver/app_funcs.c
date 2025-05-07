@@ -396,6 +396,32 @@ bool app_write_REG_PULSE_ENABLE(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
+	if ((reg & B_LED0) && !pwm.dac0)
+    {
+		pulse_countdown.dac0 = timings.pwm_on_dac0;
+		timings.is_on_dac0 = true;
+        pwm.dac0 = true;
+    } else if ((~reg & B_LED0) && pwm.dac0) {
+		pulse_countdown.dac0 = 0;
+        pwm.dac0 = false;
+	}
+
+	uint16_t daqValue = (uint16_t)(app_regs.REG_DAC0_VOLTAGE / 5000  * 65535);
+	latch_dac0(daqValue);
+
+	if ((reg & B_LED1) && !pwm.dac1)
+	{
+		pulse_countdown.dac1 = timings.pwm_on_dac1;
+		timings.is_on_dac1 = true;
+        pwm.dac1 = true;
+	} else if ((~reg & B_LED1) && pwm.dac1) {
+		pulse_countdown.dac1 = 0;
+        pwm.dac1 = false;
+	}
+
+	daqValue = (uint16_t)(app_regs.REG_DAC1_VOLTAGE / 5000  * 65535);
+	latch_dac1(daqValue);
+	
 	app_regs.REG_PULSE_ENABLE = reg;
 	return true;
 }
