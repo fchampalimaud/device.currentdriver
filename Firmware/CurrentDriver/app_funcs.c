@@ -409,7 +409,15 @@ bool app_write_REG_PULSE_DCYCLE_LED0(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
-	app_regs.REG_PULSE_DURATION_LED0 = reg;
+	if (reg < 1 || reg > 100)
+	{
+		return false;
+	}
+
+	timings.pwm_on_dac0 = reg / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
+	timings.pwm_off_dac0 = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED0 - timings.pwm_on_dac0 + 1;
+
+	app_regs.REG_PULSE_DCYCLE_LED0 = reg;
 	return true;
 }
 
@@ -422,7 +430,15 @@ bool app_write_REG_PULSE_DCYCLE_LED1(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
-	app_regs.REG_PULSE_DURATION_LED1 = reg;
+	if (reg < 1 || reg > 100)
+	{
+		return false;
+	}
+
+	timings.pwm_on_dac1 = reg / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED1) * 1000.0 + 1;
+	timings.pwm_off_dac1 = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED1 - timings.pwm_on_dac1 + 1;
+
+	app_regs.REG_PULSE_DCYCLE_LED1 = reg;
 	return true;
 }
 
@@ -434,6 +450,14 @@ void app_read_REG_PULSE_FREQUENCY_LED0(void){}
 bool app_write_REG_PULSE_FREQUENCY_LED0(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
+
+	if (reg == 0)
+	{
+		return false;
+	}
+
+	timings.pwm_on_dac0 = app_regs.REG_PULSE_DCYCLE_LED0 / (100.0 * reg) * 1000.0 + 1;
+	timings.pwm_off_dac0 = 1000.0 / reg - timings.pwm_on_dac0 + 1;
 
 	app_regs.REG_PULSE_FREQUENCY_LED0 = reg;
 	return true;
@@ -448,6 +472,14 @@ bool app_write_REG_PULSE_FREQUENCY_LED1(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
+	if (reg == 0)
+	{
+		return false;
+	}
+
+	timings.pwm_on_dac1 = app_regs.REG_PULSE_DCYCLE_LED1 / (100.0 * reg) * 1000.0 + 1;
+	timings.pwm_off_dac1 = 1000.0 / reg - timings.pwm_on_dac1 + 1;
+
 	app_regs.REG_PULSE_FREQUENCY_LED1 = reg;
 	return true;
 }
@@ -461,6 +493,11 @@ bool app_write_REG_RAMP_LED0(void *a)
 {
 	uint16_t reg = *((uint16_t*)a);
 
+	if (reg == 0)
+	{
+		return false;
+	}
+
 	app_regs.REG_RAMP_LED0 = reg;
 	return true;
 }
@@ -473,6 +510,11 @@ void app_read_REG_RAMP_LED1(void) {}
 bool app_write_REG_RAMP_LED1(void *a)
 {
 	uint16_t reg = *((uint16_t*)a);
+
+	if (reg == 0)
+	{
+		return false;
+	}
 
 	app_regs.REG_RAMP_LED1 = reg;
 	return true;
