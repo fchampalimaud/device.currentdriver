@@ -2,17 +2,20 @@
 
   <PropertyGroup>
     <Title>Harp.CurrentDriver</Title>
-    <Authors></Authors>
-    <Copyright>Copyright ©  2025</Copyright>
+    <Authors>Artur Silva, José Grilo</Authors>
+    <Copyright>Copyright © Champalimaud Foundation 2025</Copyright>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
     <Description>Bonsai Library containing interfaces for data acquisition and control of Harp CurrentDriver devices.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageType>Dependency;BonsaiLibrary</PackageType>
     <PackageTags>Harp CurrentDriver Bonsai Rx</PackageTags>
     <PackageProjectUrl></PackageProjectUrl>
-    <PackageLicenseExpression></PackageLicenseExpression>
-    <PackageIcon></PackageIcon>
+    <RepositoryUrl>https://github.com/fchampalimaud/device.currentdriver</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageOutputPath></PackageOutputPath>
     <TargetFrameworks>net462;netstandard2.0</TargetFrameworks>
     <VersionPrefix>0.2.0</VersionPrefix>
@@ -24,6 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\LICENSE" PackagePath="/"/>
+    <!-- <Content Include="..\icon.png" PackagePath="/"/> -->
     <EmbeddedResource Include="..\..\device.yml" />
   </ItemGroup>
 
