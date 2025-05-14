@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Title>Harp.CurrentDriver</Title>
-    <Authors>Artur Silva, José Grilo</Authors>
+    <Authors></Authors>
     <Copyright>Copyright © Champalimaud Foundation 2025</Copyright>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
