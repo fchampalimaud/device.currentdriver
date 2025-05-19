@@ -113,11 +113,18 @@ typedef struct
 	uint8_t REG_LED_OUT;
 	float REG_LED0_MAX_CURRENT;
 	float REG_LED1_MAX_CURRENT;
+	uint8_t REG_PULSE_ENABLE;
+	uint8_t REG_PULSE_DCYCLE_LED0;
+	uint8_t REG_PULSE_DCYCLE_LED1;
+	uint8_t REG_PULSE_FREQUENCY_LED0;
+	uint8_t REG_PULSE_FREQUENCY_LED1;
+	uint16_t REG_RAMP_LED0;
+	uint16_t REG_RAMP_LED1;
+	uint8_t REG_RAMP_CONFIG;
 	uint8_t REG_RESERVED0;
 	uint8_t REG_RESERVED1;
 	uint8_t REG_RESERVED2;
 	uint8_t REG_RESERVED3;
-	uint8_t REG_RESERVED4;
 	uint8_t REG_EVNT_ENABLE;
 } AppRegs;
 
@@ -130,21 +137,28 @@ typedef struct
 #define ADD_REG_OUTPUTS_CLEAR               34 // U16    Clear the correspondent output
 #define ADD_REG_OUTPUTS_TOGGLE              35 // U16    Toggle the correspondent output
 #define ADD_REG_OUTPUTS_OUT                 36 // U16    Control the correspondent output
-#define ADD_REG_LED0_CURRENT                37 // Float  Configuration of current to drive LED 0 [0:1000] mA
-#define ADD_REG_LED1_CURRENT                38 // Float  Configuration of current to drive LED 1 [0:1000] mA
-#define ADD_REG_DAC0_VOLTAGE                39 // Float  Configuration of DAC 0 voltage [0:5000] mV
-#define ADD_REG_DAC1_VOLTAGE                40 // Float  Configuration of DAC 1 voltage [0:5000] mV
+#define ADD_REG_LED0_CURRENT                37 // FLOAT  Configuration of current to drive LED 0 [0:1000] mA
+#define ADD_REG_LED1_CURRENT                38 // FLOAT  Configuration of current to drive LED 1 [0:1000] mA
+#define ADD_REG_DAC0_VOLTAGE                39 // FLOAT  Configuration of DAC 0 voltage [0:5000] mV
+#define ADD_REG_DAC1_VOLTAGE                40 // FLOAT  Configuration of DAC 1 voltage [0:5000] mV
 #define ADD_REG_LED_ENABLE                  41 // U8     Enable driver on the selected output
 #define ADD_REG_LED_DISABLE                 42 // U8     Disable driver on the selected output
-#define ADD_REG_LED_OUT                     43 // U8     Control the correspondent output
-#define ADD_REG_LED0_MAX_CURRENT            44 // Float  Configuration of current to drive LED 0 [0:1000] mA
-#define ADD_REG_LED1_MAX_CURRENT            45 // Float  Configuration of current to drive LED 1 [0:1000] mA
-#define ADD_REG_RESERVED0                   46 // U8     Reserved for future use
-#define ADD_REG_RESERVED1                   47 // U8     Reserved for future use
-#define ADD_REG_RESERVED2                   48 // U8     Reserved for future use
-#define ADD_REG_RESERVED3                   49 // U8     Reserved for future use
-#define ADD_REG_RESERVED4                   50 // U8     Reserved for future use
-#define ADD_REG_EVNT_ENABLE                 51 // U8     Enable the Events
+#define ADD_REG_LED_OUT                     43 // U8     Control the correspondent LED output
+#define ADD_REG_LED0_MAX_CURRENT            44 // FLOAT  Configuration of current to drive LED 0 [0:1000] mA
+#define ADD_REG_LED1_MAX_CURRENT            45 // FLOAT  Configuration of current to drive LED 1 [0:1000] mA
+#define ADD_REG_PULSE_ENABLE                46 // U8     Enables the pulse function for the specified output DACs/LEDs.
+#define ADD_REG_PULSE_DCYCLE_LED0           47 // U8     Specifies the duty cycle of the output pulse from 1 to 100.
+#define ADD_REG_PULSE_DCYCLE_LED1           48 // U8     Specifies the duty cycle of the output pulse from 1 to 100.
+#define ADD_REG_PULSE_FREQUENCY_LED0        49 // U8     Specifies the frequency of the output pulse in Hz.
+#define ADD_REG_PULSE_FREQUENCY_LED1        50 // U8     Specifies the frequency of the output pulse in Hz.
+#define ADD_REG_RAMP_LED0                   51 // U16    Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off.
+#define ADD_REG_RAMP_LED1                   52 // U16    Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off.
+#define ADD_REG_RAMP_CONFIG                 53 // U8     Specifies when the ramps are applied for each DAC/LED.
+#define ADD_REG_RESERVED0                   54 // U8     Reserved for future use
+#define ADD_REG_RESERVED1                   55 // U8     Reserved for future use
+#define ADD_REG_RESERVED2                   56 // U8     Reserved for future use
+#define ADD_REG_RESERVED3                   57 // U8     Reserved for future use
+#define ADD_REG_EVNT_ENABLE                 58 // U8     Enable the Events
 
 /************************************************************************/
 /* Current Driver registers' memory limits                              */
@@ -154,8 +168,8 @@ typedef struct
 /************************************************************************/
 /* Memory limits */
 #define APP_REGS_ADD_MIN                    0x20
-#define APP_REGS_ADD_MAX                    0x33
-#define APP_NBYTES_OF_REG_BANK              42
+#define APP_REGS_ADD_MAX                    0x3A
+#define APP_NBYTES_OF_REG_BANK              51
 
 /************************************************************************/
 /* Registers' bits                                                      */
@@ -166,6 +180,10 @@ typedef struct
 #define B_DO1                              (1<<1)       // Digital output 1
 #define B_LED0                             (1<<0)       // 
 #define B_LED1                             (1<<1)       // 
+#define B_LED0_UP                          (1<<0)       // 
+#define B_LED0_DOWN                        (1<<1)       // 
+#define B_LED1_UP                          (1<<2)       // 
+#define B_LED1_DOWN                        (1<<3)       // 
 #define B_EVT_PORT_DIS                     (1<<0)       // Event of register DIs
 
 #endif /* _APP_REGS_H_ */

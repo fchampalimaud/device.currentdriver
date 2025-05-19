@@ -6,6 +6,8 @@
 #include "app_funcs.h"
 #include "app_ios_and_regs.h"
 
+#include "structs.h"
+
 #define F_CPU 32000000 //need to be defined for delay.h
 #include <util/delay.h>												   
 /************************************************************************/
@@ -27,9 +29,9 @@ void hwbp_app_initialize(void)
 {
     /* Define versions */
     uint8_t hwH = 1;
-    uint8_t hwL = 0;
+    uint8_t hwL = 1;
     uint8_t fwH = 0;
-    uint8_t fwL = 2;
+    uint8_t fwL = 3;
     uint8_t ass = 0;
     
    	/* Start core */
@@ -59,6 +61,13 @@ void core_callback_catastrophic_error_detected(void)
 	clr_DO0;
 	
 }
+
+/************************************************************************/
+/* General definitions                                                  */
+/************************************************************************/
+countdown_t pulse_countdown;
+pulse_timings timings;
+ramp_info ramp;
 
 /************************************************************************/
 /* User functions                                                       */
@@ -109,13 +118,25 @@ void core_callback_reset_registers(void)
 	app_regs.REG_OUTPUTS_CLEAR = 0;
 	app_regs.REG_OUTPUTS_TOGGLE = 0;
 	app_regs.REG_OUTPUTS_OUT = 0;
+	app_regs.REG_PULSE_ENABLE = 0;
+	app_regs.REG_PULSE_DCYCLE_LED0 = 1;
+	app_regs.REG_PULSE_DCYCLE_LED1 = 1;
+	app_regs.REG_PULSE_FREQUENCY_LED0 = 1;
+	app_regs.REG_PULSE_FREQUENCY_LED1 = 1;
+	app_regs.REG_RAMP_LED0 = 1;
+	app_regs.REG_RAMP_LED1 = 1;
+	app_regs.REG_RAMP_CONFIG = 1;
 	app_regs.REG_EVNT_ENABLE = B_EVT_PORT_DIS;
 	
 }
 
+extern pwm_possibilities_t pwm;
+
 void core_callback_registers_were_reinitialized(void)
 {
-	/* Update registers if needed */
+	pwm.dac0 = false;
+    pwm.dac1 = false;
+    // pwm.do0 = false;
 	
 }
 
@@ -148,7 +169,70 @@ void core_callback_device_to_speed(void) {}
 void core_callback_t_before_exec(void) {}
 void core_callback_t_after_exec(void) {}
 void core_callback_t_new_second(void) {}
-void core_callback_t_500us(void) {}
+void core_callback_t_500us(void) 
+{
+	if (pulse_countdown.dac0 > 0)
+	    if (--pulse_countdown.dac0 == 0)
+	    {
+    	    if (pwm.dac0)
+    	    {
+				if (timings.is_on_dac0)
+				{
+					pulse_countdown.dac0 = timings.pwm_off_dac0;
+					timings.is_on_dac0 = false;
+					latch_dac0(0);
+				} else {
+					pulse_countdown.dac0 = timings.pwm_on_dac0;
+					timings.is_on_dac0 = true;
+					latch_dac0((uint16_t)(app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
+				}
+    	    }
+	    }
+
+	if (pulse_countdown.dac1 > 0)
+	    if (--pulse_countdown.dac1 == 0)
+	    {
+    	    if (pwm.dac1)
+    	    {
+				if (timings.is_on_dac1)
+				{
+					pulse_countdown.dac1 = timings.pwm_off_dac1;
+					timings.is_on_dac1 = false;
+					latch_dac1(0);
+				} else {
+					pulse_countdown.dac1 = timings.pwm_on_dac1;
+					timings.is_on_dac1 = true;
+					latch_dac1((uint16_t)(app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
+				}
+    	    }
+	    }
+
+	if (pulse_countdown.ramp_dac0 > 0)
+	{
+		pulse_countdown.ramp_dac0--;
+		if (ramp.is_increasing_dac0)
+		{
+			ramp.previous_value_dac0 += ramp.cycle_amount_dac0;
+    	    latch_dac0(ramp.previous_value_dac0);
+		} else {
+			ramp.previous_value_dac0 -= ramp.cycle_amount_dac0;
+    	    latch_dac0(ramp.previous_value_dac0);
+		}
+	}
+
+	if (pulse_countdown.ramp_dac1 > 0)
+	{
+		pulse_countdown.ramp_dac1--;
+		if (ramp.is_increasing_dac1)
+		{
+			ramp.previous_value_dac1 += ramp.cycle_amount_dac1;
+    	    latch_dac1(ramp.previous_value_dac1);
+		} else {
+			ramp.previous_value_dac1 -= ramp.cycle_amount_dac1;
+    	    latch_dac1(ramp.previous_value_dac1);
+		}
+	}
+}
 void core_callback_t_1ms(void) {}
 
 

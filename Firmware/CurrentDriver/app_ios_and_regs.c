@@ -69,10 +69,24 @@ uint8_t app_regs_type[] = {
 	TYPE_U8,
 	TYPE_U8,
 	TYPE_U8,
+	TYPE_U16,
+	TYPE_U16,
+	TYPE_U8,
+	TYPE_U8,
+	TYPE_U8,
+	TYPE_U8,
+	TYPE_U8,
 	TYPE_U8
 };
 
 uint16_t app_regs_n_elements[] = {
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
+	1,
 	1,
 	1,
 	1,
@@ -110,10 +124,17 @@ uint8_t *app_regs_pointer[] = {
 	(uint8_t*)(&app_regs.REG_LED_OUT),
 	(uint8_t*)(&app_regs.REG_LED0_MAX_CURRENT),
 	(uint8_t*)(&app_regs.REG_LED1_MAX_CURRENT),
+	(uint8_t*)(&app_regs.REG_PULSE_ENABLE),
+	(uint8_t*)(&app_regs.REG_PULSE_DCYCLE_LED0),
+	(uint8_t*)(&app_regs.REG_PULSE_DCYCLE_LED1),
+	(uint8_t*)(&app_regs.REG_PULSE_FREQUENCY_LED0),
+	(uint8_t*)(&app_regs.REG_PULSE_FREQUENCY_LED1),
+	(uint8_t*)(&app_regs.REG_RAMP_LED0),
+	(uint8_t*)(&app_regs.REG_RAMP_LED1),
+	(uint8_t*)(&app_regs.REG_RAMP_CONFIG),
 	(uint8_t*)(&app_regs.REG_RESERVED0),
 	(uint8_t*)(&app_regs.REG_RESERVED1),
 	(uint8_t*)(&app_regs.REG_RESERVED2),
 	(uint8_t*)(&app_regs.REG_RESERVED3),
-	(uint8_t*)(&app_regs.REG_RESERVED4),
 	(uint8_t*)(&app_regs.REG_EVNT_ENABLE)
 };

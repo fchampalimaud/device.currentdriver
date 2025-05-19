@@ -1,10 +1,10 @@
 %YAML 1.1
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/reflex-generator/main/schema/device.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/protocol/refs/heads/main/schema/device.json
 device: CurrentDriver
 whoAmI: 1282
-firmwareVersion: "0.1"
-hardwareTargets: "1.0"
+firmwareVersion: "0.3"
+hardwareTargets: "1.1"
 registers:
   DigitalInputState:
     address: 32
@@ -77,26 +77,66 @@ registers:
     <<: *ledMaxCurrent
     address: 45
     description: Configuration of current to drive LED 1 [0:1000] mA
-  Reserved0: &reserved
+  PulseEnable:
     address: 46
+    type: U8
+    access: Write
+    maskType: LedOutputs
+    description: Enables the pulse function for the specified output DACs/LEDs
+  PulseDutyCycleLed0: &pulseDutyCycle
+    address: 47
+    type: U8
+    access: Write
+    minValue: 1
+    maxValue: 100
+    description: Specifies the duty cycle of the output pulse from 1 to 100
+  PulseDutyCycleLed1:
+    <<: *pulseDutyCycle
+    address: 48
+    description: Specifies the duty cycle of the output pulse from 1 to 100
+  PulseFrequencyLed0: &pulseFrequency
+    address: 49
+    type: U8
+    access: Write
+    minValue: 1
+    description: Specifies the frequency of the output pulse in Hz
+  PulseFrequencyLed1:
+    <<: *pulseFrequency
+    address: 50
+    description: Specifies the frequency of the output pulse in Hz
+  RampLed0: &ramp
+    address: 51
+    type: U16
+    access: Write
+    minValue: 1
+    description: Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off
+  RampLed1:
+    <<: *ramp
+    address: 52
+    description: Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off
+  RampConfig:
+    address: 53
+    type: U8
+    access: Write
+    maskType: LedRamps
+    description: Specifies when the ramps are applied for each DAC/LED
+  Reserved0: &reserved
+    address: 54
     access: Read
     visibility: private
     type: U8
     description: Reserved
   Reserved1:
     <<: *reserved
-    address: 47
+    address: 55
   Reserved2:
     <<: *reserved
-    address: 48
+    address: 56
   Reserved3:
     <<: *reserved
-    address: 49
-  Reserved4:
-    <<: *reserved
-    address: 50
+    address: 57
   EnableEvents:
-    address: 51
+    address: 58
     access: Write
     type: U8
     maskType: CurrentDriverEvents
@@ -117,6 +157,13 @@ bitMasks:
     bits:
       LED0: 0x1
       LED1: 0x2
+  LedRamps:
+    description: Specifies the configuration of LED driver's ramps
+    bits:
+      LED0_UP: 0x1
+      LED0_DOWN: 0x2
+      LED1_UP: 0x4
+      LED1_DOWN: 0x8
   CurrentDriverEvents:
     description: Specifies the active events in the device.
     bits:

@@ -16,6 +16,8 @@
 	#define false 0
 #endif
 
+void latch_dac0(uint16_t word);
+void latch_dac1(uint16_t word);
 
 /************************************************************************/
 /* Prototypes                                                           */
@@ -34,11 +36,18 @@ void app_read_REG_LED_DISABLE(void);
 void app_read_REG_LED_OUT(void);
 void app_read_REG_LED0_MAX_CURRENT(void);
 void app_read_REG_LED1_MAX_CURRENT(void);
+void app_read_REG_PULSE_ENABLE(void);
+void app_read_REG_PULSE_DCYCLE_LED0(void);
+void app_read_REG_PULSE_DCYCLE_LED1(void);
+void app_read_REG_PULSE_FREQUENCY_LED0(void);
+void app_read_REG_PULSE_FREQUENCY_LED1(void);
+void app_read_REG_RAMP_LED0(void);
+void app_read_REG_RAMP_LED1(void);
+void app_read_REG_RAMP_CONFIG(void);
 void app_read_REG_RESERVED0(void);
 void app_read_REG_RESERVED1(void);
 void app_read_REG_RESERVED2(void);
 void app_read_REG_RESERVED3(void);
-void app_read_REG_RESERVED4(void);
 void app_read_REG_EVNT_ENABLE(void);
 
 bool app_write_REG_PORT_DIS(void *a);
@@ -55,11 +64,18 @@ bool app_write_REG_LED_DISABLE(void *a);
 bool app_write_REG_LED_OUT(void *a);
 bool app_write_REG_LED0_MAX_CURRENT(void *a);
 bool app_write_REG_LED1_MAX_CURRENT(void *a);
+bool app_write_REG_PULSE_ENABLE(void *a);
+bool app_write_REG_PULSE_DCYCLE_LED0(void *a);
+bool app_write_REG_PULSE_DCYCLE_LED1(void *a);
+bool app_write_REG_PULSE_FREQUENCY_LED0(void *a);
+bool app_write_REG_PULSE_FREQUENCY_LED1(void *a);
+bool app_write_REG_RAMP_LED0(void *a);
+bool app_write_REG_RAMP_LED1(void *a);
+bool app_write_REG_RAMP_CONFIG(void *a);
 bool app_write_REG_RESERVED0(void *a);
 bool app_write_REG_RESERVED1(void *a);
 bool app_write_REG_RESERVED2(void *a);
 bool app_write_REG_RESERVED3(void *a);
-bool app_write_REG_RESERVED4(void *a);
 bool app_write_REG_EVNT_ENABLE(void *a);
 
 
