@@ -155,15 +155,15 @@ bitMasks:
   LedOutputs:
     description: Specifies the state of LED driver's outputs
     bits:
-      LED0: 0x1
-      LED1: 0x2
+      Led0: 0x1
+      Led1: 0x2
   LedRamps:
     description: Specifies the configuration of LED driver's ramps
     bits:
-      LED0_UP: 0x1
-      LED0_DOWN: 0x2
-      LED1_UP: 0x4
-      LED1_DOWN: 0x8
+      Led0Up: 0x1
+      Led0Down: 0x2
+      Led1Up: 0x4
+      Led1Down: 0x8
   CurrentDriverEvents:
     description: Specifies the active events in the device.
     bits:
