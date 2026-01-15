@@ -31,7 +31,7 @@ void hwbp_app_initialize(void)
     uint8_t hwH = 1;
     uint8_t hwL = 1;
     uint8_t fwH = 0;
-    uint8_t fwL = 3;
+    uint8_t fwL = 4;
     uint8_t ass = 0;
     
    	/* Start core */
@@ -212,11 +212,21 @@ void core_callback_t_500us(void)
 		pulse_countdown.ramp_dac0--;
 		if (ramp.is_increasing_dac0)
 		{
-			ramp.previous_value_dac0 += ramp.cycle_amount_dac0;
-    	    latch_dac0(ramp.previous_value_dac0);
+	    if (ramp.remainder_dac0 > 0) {
+        	ramp.previous_value_dac0 += ramp.cycle_amount_dac0 + 1;
+        	ramp.remainder_dac0--;
+	    } else {
+        	ramp.previous_value_dac0 += ramp.cycle_amount_dac0;
+	    }
+	    latch_dac0(ramp.previous_value_dac0);
 		} else {
-			ramp.previous_value_dac0 -= ramp.cycle_amount_dac0;
-    	    latch_dac0(ramp.previous_value_dac0);
+	    if (ramp.remainder_dac0 > 0) {
+        	ramp.previous_value_dac0 -= ramp.cycle_amount_dac0 + 1;
+        	ramp.remainder_dac0--;
+	    } else {
+        	ramp.previous_value_dac0 -= ramp.cycle_amount_dac0;
+	    }
+	    latch_dac0(ramp.previous_value_dac0);
 		}
 	}
 
@@ -225,11 +235,21 @@ void core_callback_t_500us(void)
 		pulse_countdown.ramp_dac1--;
 		if (ramp.is_increasing_dac1)
 		{
-			ramp.previous_value_dac1 += ramp.cycle_amount_dac1;
-    	    latch_dac1(ramp.previous_value_dac1);
+	    if (ramp.remainder_dac1 > 0) {
+        	ramp.previous_value_dac1 += ramp.cycle_amount_dac1 + 1;
+        	ramp.remainder_dac1--;
+	    } else {
+        	ramp.previous_value_dac1 += ramp.cycle_amount_dac1;
+	    }
+	    latch_dac1(ramp.previous_value_dac1);
 		} else {
-			ramp.previous_value_dac1 -= ramp.cycle_amount_dac1;
-    	    latch_dac1(ramp.previous_value_dac1);
+	    if (ramp.remainder_dac1 > 0) {
+        	ramp.previous_value_dac1 -= ramp.cycle_amount_dac1 + 1;
+        	ramp.remainder_dac1--;
+	    } else {
+        	ramp.previous_value_dac1 -= ramp.cycle_amount_dac1;
+	    }
+	    latch_dac1(ramp.previous_value_dac1);
 		}
 	}
 }

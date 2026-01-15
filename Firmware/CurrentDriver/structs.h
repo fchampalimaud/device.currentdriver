@@ -40,6 +40,7 @@ typedef struct
 {
     bool is_increasing_dac0, is_increasing_dac1;
     uint16_t cycle_amount_dac0, cycle_amount_dac1;
+    uint16_t remainder_dac0, remainder_dac1;
     uint16_t previous_value_dac0, previous_value_dac1;
     uint16_t intended_value_dac0, intended_value_dac1;
 } ramp_info;

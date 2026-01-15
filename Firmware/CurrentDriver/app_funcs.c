@@ -271,12 +271,14 @@ bool app_write_REG_DAC0_VOLTAGE(void *a)
 		if ((reg > app_regs.REG_DAC0_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED0_UP)) {
 			ramp.is_increasing_dac0 = true;
 			ramp.cycle_amount_dac0 = (uint16_t)(((reg - app_regs.REG_DAC0_VOLTAGE) / 5000  * 65535) / app_regs.REG_RAMP_LED0);
+			ramp.remainder_dac0 = (uint16_t)(((reg - app_regs.REG_DAC0_VOLTAGE) / 5000 * 65535) - ramp.cycle_amount_dac0 * app_regs.REG_RAMP_LED0);
 			ramp.previous_value_dac0 = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
 			ramp.intended_value_dac0 = (uint16_t)((reg / 5000  * 65535));
 			pulse_countdown.ramp_dac0 = app_regs.REG_RAMP_LED0;
 		} else if ((reg < app_regs.REG_DAC0_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED0_DOWN)) {
 			ramp.is_increasing_dac0 = false;
 			ramp.cycle_amount_dac0 = (uint16_t)(((app_regs.REG_DAC0_VOLTAGE - reg) / 5000  * 65535) / app_regs.REG_RAMP_LED0);
+			ramp.remainder_dac0 = (uint16_t)(((app_regs.REG_DAC0_VOLTAGE - reg) / 5000 * 65535) - ramp.cycle_amount_dac0 * app_regs.REG_RAMP_LED0);
 			ramp.previous_value_dac0 = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
 			ramp.intended_value_dac0 = (uint16_t)((reg / 5000  * 65535));
 			pulse_countdown.ramp_dac0 = app_regs.REG_RAMP_LED0;
@@ -309,12 +311,14 @@ bool app_write_REG_DAC1_VOLTAGE(void *a)
 		if ((reg > app_regs.REG_DAC1_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED1_UP)) {
 			ramp.is_increasing_dac1 = true;
 			ramp.cycle_amount_dac1 = (uint16_t)(((reg - app_regs.REG_DAC1_VOLTAGE) / 5000  * 65535) / app_regs.REG_RAMP_LED1);
+			ramp.remainder_dac1 = (uint16_t)(((reg - app_regs.REG_DAC1_VOLTAGE) / 5000 * 65535) - ramp.cycle_amount_dac1 * app_regs.REG_RAMP_LED1);
 			ramp.previous_value_dac1 = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
 			ramp.intended_value_dac1 = (uint16_t)((reg / 5000  * 65535));
 			pulse_countdown.ramp_dac1 = app_regs.REG_RAMP_LED1;
 		} else if ((reg < app_regs.REG_DAC1_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED1_DOWN)){
 			ramp.is_increasing_dac1 = false;
 			ramp.cycle_amount_dac1 = (uint16_t)(((app_regs.REG_DAC1_VOLTAGE - reg) / 5000  * 65535) / app_regs.REG_RAMP_LED1);
+			ramp.remainder_dac1 = (uint16_t)(((app_regs.REG_DAC1_VOLTAGE - reg) / 5000 * 65535) - ramp.cycle_amount_dac1 * app_regs.REG_RAMP_LED1);
 			ramp.previous_value_dac1 = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
 			ramp.intended_value_dac1 = (uint16_t)((reg / 5000  * 65535));
 			pulse_countdown.ramp_dac1 = app_regs.REG_RAMP_LED1;
