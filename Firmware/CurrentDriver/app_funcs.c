@@ -480,6 +480,11 @@ bool app_write_REG_PULSE_DCYCLE_LED0(void *a)
 
 	timings.pwm_on_dac0 = reg / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
 	timings.pwm_off_dac0 = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED0 - timings.pwm_on_dac0 + 1;
+	
+	if ((app_regs.REG_PULSE_ENABLE & B_LED0) && pwm.dac0)
+	{
+		pulse_countdown.dac0 = timings.pwm_on_dac0;
+	}
 
 	app_regs.REG_PULSE_DCYCLE_LED0 = reg;
 	return true;
@@ -501,6 +506,11 @@ bool app_write_REG_PULSE_DCYCLE_LED1(void *a)
 
 	timings.pwm_on_dac1 = reg / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED1) * 1000.0 + 1;
 	timings.pwm_off_dac1 = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED1 - timings.pwm_on_dac1 + 1;
+	
+	if ((app_regs.REG_PULSE_ENABLE & B_LED1) && pwm.dac1)
+	{
+		pulse_countdown.dac1 = timings.pwm_on_dac1;
+	}
 
 	app_regs.REG_PULSE_DCYCLE_LED1 = reg;
 	return true;
