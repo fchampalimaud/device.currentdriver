@@ -31,7 +31,7 @@ void hwbp_app_initialize(void)
     uint8_t hwH = 1;
     uint8_t hwL = 1;
     uint8_t fwH = 0;
-    uint8_t fwL = 4;
+    uint8_t fwL = 5;
     uint8_t ass = 0;
     
    	/* Start core */
@@ -68,6 +68,7 @@ void core_callback_catastrophic_error_detected(void)
 countdown_t pulse_countdown;
 pulse_timings timings;
 ramp_info ramp;
+protocol_state protocols = {OFF, OFF};
 
 /************************************************************************/
 /* User functions                                                       */
@@ -80,17 +81,14 @@ ramp_info ramp;
 void core_callback_define_clock_default(void) {}
 
 void core_callback_initialize_hardware(void){
-	
+
 	init_ios();
-	
-	
+
 	/* Initialize SPI with 4MHz */
 	SPID_CTRL = SPI_MASTER_bm | SPI_ENABLE_bm | SPI_MODE_0_gc | SPI_CLK2X_bm | SPI_PRESCALER_DIV16_gc;
-		
 
-	
-	
-}				 
+}
+
 void core_callback_1st_config_hw_after_boot(void)
 {
 	/* Initialize IOs */
@@ -99,10 +97,10 @@ void core_callback_1st_config_hw_after_boot(void)
 	
 	/* Initialize SPI with 4MHz */
 	SPID_CTRL = SPI_MASTER_bm | SPI_ENABLE_bm | SPI_MODE_0_gc | SPI_CLK2X_bm | SPI_PRESCALER_DIV16_gc;
-	
+
 }
 
-void core_callback_reset_registers(void)
+void core_callback_reset_registers(void) // TODO
 {
 	/* Initialize registers */
 	app_regs.REG_DAC0_VOLTAGE = 0;

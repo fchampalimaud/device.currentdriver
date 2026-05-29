@@ -45,4 +45,13 @@ typedef struct
     uint16_t intended_value_dac0, intended_value_dac1;
 } ramp_info;
 
+enum protocol_state {
+    OFF, DELAY, RISE, ON, FALL
+}
+
+typedef struct
+{
+    enum protocol_state led0, led1;
+} protocol_state;
+
 #endif /* _STRUCT_H_ */

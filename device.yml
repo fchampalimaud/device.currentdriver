@@ -3,7 +3,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/protocol/refs/heads/main/schema/device.json
 device: CurrentDriver
 whoAmI: 1282
-firmwareVersion: "0.4"
+firmwareVersion: "0.5"
 hardwareTargets: "1.1"
 registers:
   DigitalInputState:
@@ -14,7 +14,7 @@ registers:
     description: Reflects the state of DI digital lines
   OutputSet: &output
     address: 33
-    type: U16
+    type: U8
     access: Write
     maskType: DigitalOutputs
     description: Set the specified digital output lines
@@ -30,8 +30,27 @@ registers:
     <<: *output
     address: 36
     description: Write the state of all digital output lines
-  Led0Current: &ledCurrent
+  LedEnable: &led
     address: 37
+    type: U8
+    access: Write
+    maskType: LedOutputs
+    description: Enable driver on the selected output
+  LedDisable:
+    <<: *led
+    address: 38
+    description: Disable driver on the selected output
+  LedState:
+    <<: *led
+    address: 39
+    description: Control the respective LED output
+  LedTargetState:
+    <<: *led
+    address: 40
+    access: Event
+    description: Sends an event when the LED reaches the target value
+  Led0Current: &ledCurrent
+    address: 41
     type: Float
     access: Write
     minValue: 0
@@ -39,35 +58,10 @@ registers:
     description: Configuration of current to drive LED 0 [0:1000] mA
   Led1Current:
     <<: *ledCurrent
-    address: 38
-    description: Configuration of current to drive LED 1 [0:1000] mA
-  Dac0Voltage: &dacVoltage
-    address: 39
-    type: Float
-    access: Write
-    minValue: 0
-    maxValue: 5000
-    description: Configuration of DAC 0 voltage [0:5000] mV
-  Dac1Voltage:
-    <<: *dacVoltage
-    address: 40
-    description: Configuration of DAC 1 voltage [0:5000] mV
-  LedEnable: &led
-    address: 41
-    type: U8
-    access: Write
-    maskType: LedOutputs
-    description: Enable driver on the selected output
-  LedDisable:
-    <<: *led
     address: 42
-    description: Disable driver on the selected output
-  LedState:
-    <<: *led
-    address: 43
-    description: Control the correspondent LED output
+    description: Configuration of current to drive LED 1 [0:1000] mA
   Led0MaxCurrent: &ledMaxCurrent
-    address: 44
+    address: 43
     type: Float
     access: Write
     minValue: 0
@@ -75,16 +69,27 @@ registers:
     description: Configuration of current to drive LED 0 [0:1000] mA
   Led1MaxCurrent:
     <<: *ledMaxCurrent
-    address: 45
+    address: 44
     description: Configuration of current to drive LED 1 [0:1000] mA
-  PulseEnable:
+  Dac0Voltage: &dacVoltage
+    address: 45
+    type: Float
+    access: Write
+    minValue: 0
+    maxValue: 5000
+    description: Configuration of DAC 0 voltage [0:5000] mV
+  Dac1Voltage:
+    <<: *dacVoltage
     address: 46
+    description: Configuration of DAC 1 voltage [0:5000] mV
+  PulseEnable:
+    address: 47
     type: U8
     access: Write
     maskType: LedOutputs
     description: Enables the pulse function for the specified output DACs/LEDs
   PulseDutyCycleLed0: &pulseDutyCycle
-    address: 47
+    address: 48
     type: U8
     access: Write
     minValue: 1
@@ -92,51 +97,89 @@ registers:
     description: Specifies the duty cycle of the output pulse from 1 to 100
   PulseDutyCycleLed1:
     <<: *pulseDutyCycle
-    address: 48
+    address: 49
     description: Specifies the duty cycle of the output pulse from 1 to 100
   PulseFrequencyLed0: &pulseFrequency
-    address: 49
+    address: 50
     type: U8
     access: Write
     minValue: 1
     description: Specifies the frequency of the output pulse in Hz
   PulseFrequencyLed1:
     <<: *pulseFrequency
-    address: 50
+    address: 51
     description: Specifies the frequency of the output pulse in Hz
   RampLed0: &ramp
-    address: 51
+    address: 52
     type: U16
     access: Write
     minValue: 1
     description: Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off
   RampLed1:
     <<: *ramp
-    address: 52
+    address: 53
     description: Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off
   RampConfig:
-    address: 53
+    address: 54
     type: U8
     access: Write
     maskType: LedRamps
     description: Specifies when the ramps are applied for each DAC/LED
+  Protocol0Duration: &protocolDuration
+    address: 55
+    type: U16
+    access: Write
+    description: Specifies the duration of LED0 protocol
+  Protocol1Duration:
+    <<: *protocolDuration
+    address: 56
+    description: Specifies the duration of LED1 protocol
+  Protocol0Delay: &protocolDelay
+    address: 57
+    type: U16
+    access: Write
+    description: Specifies the delay of the LED0 protocol
+  Protocol1Delay:
+    <<: *protocolDelay
+    address: 58
+    description: Specifies the delay of the LED1 protocol
+  EnableProtocol: &protocol
+    address: 59
+    type: U8
+    access: Write
+    maskType: LedOutputs
+    description: Enable the respective protocol
+  DisableProtocol:
+    <<: *protocol
+    address: 60
+    description: Disable the respective protocol
+  DI0Trigger: &digitalInputTrigger
+    address: 61
+    type: U8
+    access: Write
+    maskType: DITriggerConfig
+    description: Configures the callback function triggered when DI0 is triggered
+  DI1Trigger:
+    <<: *digitalInputTrigger
+    address: 62
+    description: Configures the callback function triggered when DI1 is triggered
   Reserved0: &reserved
-    address: 54
+    address: 63
     access: Read
     visibility: private
     type: U8
     description: Reserved
   Reserved1:
     <<: *reserved
-    address: 55
+    address: 64
   Reserved2:
     <<: *reserved
-    address: 56
+    address: 65
   Reserved3:
     <<: *reserved
-    address: 57
+    address: 66
   EnableEvents:
-    address: 58
+    address: 67
     access: Write
     type: U8
     maskType: CurrentDriverEvents
@@ -155,16 +198,25 @@ bitMasks:
   LedOutputs:
     description: Specifies the state of LED driver's outputs
     bits:
-      LED0: 0x1
-      LED1: 0x2
+      Led0: 0x1
+      Led1: 0x2
   LedRamps:
     description: Specifies the configuration of LED driver's ramps
     bits:
-      LED0_UP: 0x1
-      LED0_DOWN: 0x2
-      LED1_UP: 0x4
-      LED1_DOWN: 0x8
+      Led0Rise: 0x1
+      Led0Fall: 0x2
+      Led1Rise: 0x4
+      Led1Fall: 0x8
   CurrentDriverEvents:
     description: Specifies the active events in the device.
     bits:
       DIs: 0x1
+      LedState: 0x2
+  groupMasks:
+    DITriggerConfig:
+    description:
+    values:
+      Digital: 0
+      ControlLed: 1
+      StartProtocol: 2
+      StartAndStopProtocol: 3

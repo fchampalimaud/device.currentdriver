@@ -10,6 +10,7 @@
 extern countdown_t pulse_countdown;
 extern pulse_timings timings;
 extern ramp_info ramp;
+extern protocol_state protocols;
 
 extern timer_conf_t timer_conf;
 extern is_new_timer_conf_t is_new_timer_conf;
@@ -27,15 +28,16 @@ void (*app_func_rd_pointer[])(void) = {
 	&app_read_REG_OUTPUTS_CLEAR,
 	&app_read_REG_OUTPUTS_TOGGLE,
 	&app_read_REG_OUTPUTS_OUT,
-	&app_read_REG_LED0_CURRENT,
-	&app_read_REG_LED1_CURRENT,
-	&app_read_REG_DAC0_VOLTAGE,
-	&app_read_REG_DAC1_VOLTAGE,
 	&app_read_REG_LED_ENABLE,
 	&app_read_REG_LED_DISABLE,
 	&app_read_REG_LED_OUT,
+	&app_read_REG_LED_TARGET_STATE,
+	&app_read_REG_LED0_CURRENT,
+	&app_read_REG_LED1_CURRENT,
 	&app_read_REG_LED0_MAX_CURRENT,
 	&app_read_REG_LED1_MAX_CURRENT,
+	&app_read_REG_DAC0_VOLTAGE,
+	&app_read_REG_DAC1_VOLTAGE,
 	&app_read_REG_PULSE_ENABLE,
 	&app_read_REG_PULSE_DCYCLE_LED0,
 	&app_read_REG_PULSE_DCYCLE_LED1,
@@ -44,6 +46,14 @@ void (*app_func_rd_pointer[])(void) = {
 	&app_read_REG_RAMP_LED0,
 	&app_read_REG_RAMP_LED1,
 	&app_read_REG_RAMP_CONFIG,
+	&app_read_REG_PROTOCOL0_DURATION,
+	&app_read_REG_PROTOCOL1_DURATION,
+	&app_read_REG_PROTOCOL0_DELAY,
+	&app_read_REG_PROTOCOL1_DELAY,
+	&app_read_REG_ENABLE_PROTOCOL,
+	&app_read_REG_DISABLE_PROTOCOL,
+	&app_read_REG_DI0_TRIGGER,
+	&app_read_REG_DI1_TRIGGER,
 	&app_read_REG_RESERVED0,
 	&app_read_REG_RESERVED1,
 	&app_read_REG_RESERVED2,
@@ -57,15 +67,16 @@ bool (*app_func_wr_pointer[])(void*) = {
 	&app_write_REG_OUTPUTS_CLEAR,
 	&app_write_REG_OUTPUTS_TOGGLE,
 	&app_write_REG_OUTPUTS_OUT,
-	&app_write_REG_LED0_CURRENT,
-	&app_write_REG_LED1_CURRENT,
-	&app_write_REG_DAC0_VOLTAGE,
-	&app_write_REG_DAC1_VOLTAGE,
 	&app_write_REG_LED_ENABLE,
 	&app_write_REG_LED_DISABLE,
 	&app_write_REG_LED_OUT,
+	&app_write_REG_LED_TARGET_STATE,
+	&app_write_REG_LED0_CURRENT,
+	&app_write_REG_LED1_CURRENT,
 	&app_write_REG_LED0_MAX_CURRENT,
 	&app_write_REG_LED1_MAX_CURRENT,
+	&app_write_REG_DAC0_VOLTAGE,
+	&app_write_REG_DAC1_VOLTAGE,
 	&app_write_REG_PULSE_ENABLE,
 	&app_write_REG_PULSE_DCYCLE_LED0,
 	&app_write_REG_PULSE_DCYCLE_LED1,
@@ -74,6 +85,14 @@ bool (*app_func_wr_pointer[])(void*) = {
 	&app_write_REG_RAMP_LED0,
 	&app_write_REG_RAMP_LED1,
 	&app_write_REG_RAMP_CONFIG,
+	&app_write_REG_PROTOCOL0_DURATION,
+	&app_write_REG_PROTOCOL1_DURATION,
+	&app_write_REG_PROTOCOL0_DELAY,
+	&app_write_REG_PROTOCOL1_DELAY,
+	&app_write_REG_ENABLE_PROTOCOL,
+	&app_write_REG_DISABLE_PROTOCOL,
+	&app_write_REG_DI0_TRIGGER,
+	&app_write_REG_DI1_TRIGGER,
 	&app_write_REG_RESERVED0,
 	&app_write_REG_RESERVED1,
 	&app_write_REG_RESERVED2,
@@ -210,130 +229,6 @@ void latch_dac1(uint16_t word)
 
 
 /************************************************************************/
-/* REG_LED0_CURRENT                                                     */
-/************************************************************************/
-// TODO: IMPLEMENT RAMP AND PULSES
-void app_read_REG_LED0_CURRENT(void) {}
-bool app_write_REG_LED0_CURRENT(void *a)
-{
-	float reg = *((float*)a);
-	
-	if (reg < 0 || (reg > 1000 && reg > app_regs.REG_LED0_MAX_CURRENT))
-	{
-		return false;
-	}
-
-	uint16_t daqValue = (uint16_t)(reg / 1000  * 65535);
-	latch_dac0(daqValue);
-
-	app_regs.REG_LED0_CURRENT = reg;
-	return true;
-}
-
-
-/************************************************************************/
-/* REG_LED1_CURRENT                                                     */
-/************************************************************************/
-// TODO: IMPLEMENT RAMP AND PULSES
-void app_read_REG_LED1_CURRENT(void) {}
-bool app_write_REG_LED1_CURRENT(void *a)
-{
-	float reg = *((float*)a);
-
-	if (reg < 0 || (reg > 1000 && reg > app_regs.REG_LED1_MAX_CURRENT))
-	{
-		return false;
-	}
-	
-	uint16_t daqValue = (uint16_t)(reg / 1000  * 65535);
-	latch_dac1(daqValue);
-
-	app_regs.REG_LED1_CURRENT = reg;
-	return true;
-}
-
-
-/************************************************************************/
-/* REG_DAC0_VOLTAGE                                                     */
-/************************************************************************/
-void app_read_REG_DAC0_VOLTAGE(void) {}
-bool app_write_REG_DAC0_VOLTAGE(void *a)
-{
-	float reg = *((float*)a);
-
-	if (reg < 0 || reg > 5000)
-	{
-		return false;
-	}
-
-	if (~app_regs.REG_PULSE_ENABLE & B_LED0)
-	{
-		if ((reg > app_regs.REG_DAC0_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED0_UP)) {
-			ramp.is_increasing_dac0 = true;
-			ramp.cycle_amount_dac0 = (uint16_t)(((reg - app_regs.REG_DAC0_VOLTAGE) / 5000  * 65535) / app_regs.REG_RAMP_LED0);
-			ramp.remainder_dac0 = (uint16_t)(((reg - app_regs.REG_DAC0_VOLTAGE) / 5000 * 65535) - ramp.cycle_amount_dac0 * app_regs.REG_RAMP_LED0);
-			ramp.previous_value_dac0 = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
-			ramp.intended_value_dac0 = (uint16_t)((reg / 5000  * 65535));
-			pulse_countdown.ramp_dac0 = app_regs.REG_RAMP_LED0;
-		} else if ((reg < app_regs.REG_DAC0_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED0_DOWN)) {
-			ramp.is_increasing_dac0 = false;
-			ramp.cycle_amount_dac0 = (uint16_t)(((app_regs.REG_DAC0_VOLTAGE - reg) / 5000  * 65535) / app_regs.REG_RAMP_LED0);
-			ramp.remainder_dac0 = (uint16_t)(((app_regs.REG_DAC0_VOLTAGE - reg) / 5000 * 65535) - ramp.cycle_amount_dac0 * app_regs.REG_RAMP_LED0);
-			ramp.previous_value_dac0 = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
-			ramp.intended_value_dac0 = (uint16_t)((reg / 5000  * 65535));
-			pulse_countdown.ramp_dac0 = app_regs.REG_RAMP_LED0;
-		} else {
-			uint16_t daqValue = (uint16_t)(reg / 5000  * 65535);
-			latch_dac0(daqValue);
-		}
-	}
-
-	app_regs.REG_DAC0_VOLTAGE = reg;
-	return true;
-}
-
-
-/************************************************************************/
-/* REG_DAC1_VOLTAGE                                                     */
-/************************************************************************/
-void app_read_REG_DAC1_VOLTAGE(void) {}
-bool app_write_REG_DAC1_VOLTAGE(void *a)
-{
-	float reg = *((float*)a);
-
-	if (reg < 0 || reg > 5000)
-	{
-		return false;
-	}
-
-	if (~app_regs.REG_PULSE_ENABLE & B_LED1)
-	{
-		if ((reg > app_regs.REG_DAC1_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED1_UP)) {
-			ramp.is_increasing_dac1 = true;
-			ramp.cycle_amount_dac1 = (uint16_t)(((reg - app_regs.REG_DAC1_VOLTAGE) / 5000  * 65535) / app_regs.REG_RAMP_LED1);
-			ramp.remainder_dac1 = (uint16_t)(((reg - app_regs.REG_DAC1_VOLTAGE) / 5000 * 65535) - ramp.cycle_amount_dac1 * app_regs.REG_RAMP_LED1);
-			ramp.previous_value_dac1 = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
-			ramp.intended_value_dac1 = (uint16_t)((reg / 5000  * 65535));
-			pulse_countdown.ramp_dac1 = app_regs.REG_RAMP_LED1;
-		} else if ((reg < app_regs.REG_DAC1_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED1_DOWN)){
-			ramp.is_increasing_dac1 = false;
-			ramp.cycle_amount_dac1 = (uint16_t)(((app_regs.REG_DAC1_VOLTAGE - reg) / 5000  * 65535) / app_regs.REG_RAMP_LED1);
-			ramp.remainder_dac1 = (uint16_t)(((app_regs.REG_DAC1_VOLTAGE - reg) / 5000 * 65535) - ramp.cycle_amount_dac1 * app_regs.REG_RAMP_LED1);
-			ramp.previous_value_dac1 = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
-			ramp.intended_value_dac1 = (uint16_t)((reg / 5000  * 65535));
-			pulse_countdown.ramp_dac1 = app_regs.REG_RAMP_LED1;
-		} else {
-			uint16_t daqValue = (uint16_t)(reg / 5000  * 65535);
-			latch_dac1(daqValue);
-		}
-	}
-
-	app_regs.REG_DAC1_VOLTAGE = reg;
-	return true;
-}
-
-
-/************************************************************************/
 /* REG_LED_ENABLE                                                       */
 /************************************************************************/
 void app_read_REG_LED_ENABLE(void) {}
@@ -341,8 +236,25 @@ bool app_write_REG_LED_ENABLE(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
-	if (reg & B_LED0) clr_I_OFF_DAC0;
-	if (reg & B_LED1) clr_I_OFF_DAC1;
+	if (reg & B_LED0) 
+	{
+		if (app_regs.REG_LED0_CURRENT > app_regs.REG_LED0_MAX_CURRENT)
+		{
+			app_regs.REG_LED0_CURRENT = app_regs.REG_LED0_MAX_CURRENT;
+			app_regs.REG_DAC0_VOLTAGE = 5 * app_regs.REG_LED0_MAX_CURRENT;
+		}
+		clr_I_OFF_DAC0;
+	}
+
+	if (reg & B_LED1) 
+	{
+		if (app_regs.REG_LED1_CURRENT > app_regs.REG_LED1_MAX_CURRENT)
+		{
+			app_regs.REG_LED1_CURRENT = app_regs.REG_LED1_MAX_CURRENT;
+			app_regs.REG_DAC1_VOLTAGE = 5 * app_regs.REG_LED1_MAX_CURRENT;
+		}
+		clr_I_OFF_DAC1;
+	}
 
 	app_regs.REG_LED_OUT &= ~reg;
 	app_regs.REG_LED_ENABLE = reg;
@@ -364,6 +276,7 @@ bool app_write_REG_LED_DISABLE(void *a)
 
 	app_regs.REG_LED_OUT |= reg;
 	app_regs.REG_LED_DISABLE = reg;
+
 	return true;
 }
 
@@ -380,10 +293,79 @@ bool app_write_REG_LED_OUT(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
 
-	if (reg & B_LED0) clr_I_OFF_DAC0; else set_I_OFF_DAC0;
-	if (reg & B_LED1) clr_I_OFF_DAC1; else set_I_OFF_DAC1;
+	if (reg & B_LED0) 
+	{
+		if (app_regs.REG_LED0_CURRENT > app_regs.REG_LED0_MAX_CURRENT)
+		{
+			app_regs.REG_LED0_CURRENT = app_regs.REG_LED0_MAX_CURRENT;
+			app_regs.REG_DAC0_VOLTAGE = 5 * app_regs.REG_LED0_MAX_CURRENT;
+		}
+		clr_I_OFF_DAC0;
+	} else {
+		set_I_OFF_DAC0;
+	}
+
+	if (reg & B_LED1) {
+		if (app_regs.REG_LED1_CURRENT > app_regs.REG_LED1_MAX_CURRENT)
+		{
+			app_regs.REG_LED1_CURRENT = app_regs.REG_LED1_MAX_CURRENT;
+			app_regs.REG_DAC1_VOLTAGE = 5 * app_regs.REG_LED1_MAX_CURRENT;
+		}
+		clr_I_OFF_DAC1;
+	} else {
+		set_I_OFF_DAC1;
+	}
 
 	app_regs.REG_LED_OUT = reg;
+
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_LED_TARGET_STATE                                                 */
+/************************************************************************/
+// TODO
+void app_read_REG_LED_TARGET_STATE(void) {}
+bool app_write_REG_LED_TARGET_STATE(void *a) { return false; }
+
+
+/************************************************************************/
+/* REG_LED0_CURRENT                                                     */
+/************************************************************************/
+void app_read_REG_LED0_CURRENT(void) {}
+bool app_write_REG_LED0_CURRENT(void *a)
+{
+	float reg = *((float*)a);
+	
+	if (reg < 0 || (reg > 1000 && reg > app_regs.REG_LED0_MAX_CURRENT))
+	{
+		return false;
+	}
+
+	app_regs.REG_LED0_CURRENT = reg;
+	app.regs.REG_DAC0_VOLTAGE = 5 * reg;
+
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_LED1_CURRENT                                                     */
+/************************************************************************/
+void app_read_REG_LED1_CURRENT(void) {}
+bool app_write_REG_LED1_CURRENT(void *a)
+{
+	float reg = *((float*)a);
+
+	if (reg < 0 || (reg > 1000 && reg > app_regs.REG_LED1_MAX_CURRENT))
+	{
+		return false;
+	}
+
+	app_regs.REG_LED1_CURRENT = reg;
+	app.regs.REG_DAC1_VOLTAGE = 5 * reg;
+
 	return true;
 }
 
@@ -401,6 +383,12 @@ bool app_write_REG_LED0_MAX_CURRENT(void *a)
 		return false;
 	}
 
+	if (app_regs.REG_LED0_CURRENT > reg && app_regs.REG_LED_OUT & B_LED0)
+	{
+		app_regs.REG_LED0_CURRENT = reg;
+		app.regs.REG_DAC0_VOLTAGE = 5 * reg;
+	}
+	
 	app_regs.REG_LED0_MAX_CURRENT = reg;
 	
 	return true;
@@ -420,8 +408,103 @@ bool app_write_REG_LED1_MAX_CURRENT(void *a)
 		return false;
 	}
 
+	if (app_regs.REG_LED1_CURRENT > reg && app_regs.REG_LED_OUT & B_LED1)
+	{
+		app_regs.REG_LED1_CURRENT = reg;
+		app.regs.REG_DAC1_VOLTAGE = 5 * reg;
+	}
+
 	app_regs.REG_LED1_MAX_CURRENT = reg;
 	
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_DAC0_VOLTAGE                                                     */
+/************************************************************************/
+void app_read_REG_DAC0_VOLTAGE(void) {}
+bool app_write_REG_DAC0_VOLTAGE(void *a)
+{
+	float reg = *((float*)a);
+
+	if (reg < 0 || reg > 5000 || ((reg / 5) > app_regs.REG_LED0_MAX_CURRENT && app_regs.REG_LED_OUT & B_LED0))
+	{
+		return false;
+	}
+
+	// if (~app_regs.REG_PULSE_ENABLE & B_LED0)
+	// {
+	// 	if ((reg > app_regs.REG_DAC0_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED0_UP)) {
+	// 		ramp.is_increasing_dac0 = true;
+	// 		ramp.cycle_amount_dac0 = (uint16_t)(((reg - app_regs.REG_DAC0_VOLTAGE) / 5000  * 65535) / app_regs.REG_RAMP_LED0);
+	// 		ramp.remainder_dac0 = (uint16_t)(((reg - app_regs.REG_DAC0_VOLTAGE) / 5000 * 65535) - ramp.cycle_amount_dac0 * app_regs.REG_RAMP_LED0);
+	// 		ramp.previous_value_dac0 = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
+	// 		ramp.intended_value_dac0 = (uint16_t)((reg / 5000  * 65535));
+	// 		pulse_countdown.ramp_dac0 = app_regs.REG_RAMP_LED0;
+	// 	} else if ((reg < app_regs.REG_DAC0_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED0_DOWN)) {
+	// 		ramp.is_increasing_dac0 = false;
+	// 		ramp.cycle_amount_dac0 = (uint16_t)(((app_regs.REG_DAC0_VOLTAGE - reg) / 5000  * 65535) / app_regs.REG_RAMP_LED0);
+	// 		ramp.remainder_dac0 = (uint16_t)(((app_regs.REG_DAC0_VOLTAGE - reg) / 5000 * 65535) - ramp.cycle_amount_dac0 * app_regs.REG_RAMP_LED0);
+	// 		ramp.previous_value_dac0 = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
+	// 		ramp.intended_value_dac0 = (uint16_t)((reg / 5000  * 65535));
+	// 		pulse_countdown.ramp_dac0 = app_regs.REG_RAMP_LED0;
+	// 	} else {
+	// 		uint16_t daqValue = (uint16_t)(reg / 5000  * 65535);
+	// 		latch_dac0(daqValue);
+	// 	}
+	// }
+
+	app_regs.REG_LED0_VOLTAGE = reg / 5;
+	app_regs.REG_DAC0_VOLTAGE = reg;
+
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_DAC1_VOLTAGE                                                     */
+/************************************************************************/
+void app_read_REG_DAC1_VOLTAGE(void) {}
+bool app_write_REG_DAC1_VOLTAGE(void *a)
+{
+	float reg = *((float*)a);
+
+	if (reg < 0 || reg > 5000)
+	{
+		return false;
+	}
+
+	if (reg < 0 || reg > 5000 || ((reg / 5) > app_regs.REG_LED1_MAX_CURRENT && app_regs.REG_LED_OUT & B_LED1))
+	{
+		return false;
+	}
+
+	// if (~app_regs.REG_PULSE_ENABLE & B_LED1)
+	// {
+	// 	if ((reg > app_regs.REG_DAC1_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED1_UP)) {
+	// 		ramp.is_increasing_dac1 = true;
+	// 		ramp.cycle_amount_dac1 = (uint16_t)(((reg - app_regs.REG_DAC1_VOLTAGE) / 5000  * 65535) / app_regs.REG_RAMP_LED1);
+	// 		ramp.remainder_dac1 = (uint16_t)(((reg - app_regs.REG_DAC1_VOLTAGE) / 5000 * 65535) - ramp.cycle_amount_dac1 * app_regs.REG_RAMP_LED1);
+	// 		ramp.previous_value_dac1 = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
+	// 		ramp.intended_value_dac1 = (uint16_t)((reg / 5000  * 65535));
+	// 		pulse_countdown.ramp_dac1 = app_regs.REG_RAMP_LED1;
+	// 	} else if ((reg < app_regs.REG_DAC1_VOLTAGE) && (app_regs.REG_RAMP_CONFIG & B_LED1_DOWN)){
+	// 		ramp.is_increasing_dac1 = false;
+	// 		ramp.cycle_amount_dac1 = (uint16_t)(((app_regs.REG_DAC1_VOLTAGE - reg) / 5000  * 65535) / app_regs.REG_RAMP_LED1);
+	// 		ramp.remainder_dac1 = (uint16_t)(((app_regs.REG_DAC1_VOLTAGE - reg) / 5000 * 65535) - ramp.cycle_amount_dac1 * app_regs.REG_RAMP_LED1);
+	// 		ramp.previous_value_dac1 = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
+	// 		ramp.intended_value_dac1 = (uint16_t)((reg / 5000  * 65535));
+	// 		pulse_countdown.ramp_dac1 = app_regs.REG_RAMP_LED1;
+	// 	} else {
+	// 		uint16_t daqValue = (uint16_t)(reg / 5000  * 65535);
+	// 		latch_dac1(daqValue);
+	// 	}
+	// }
+
+	app_regs.REG_LED1_VOLTAGE = reg / 5;
+	app_regs.REG_DAC1_VOLTAGE = reg;
+
 	return true;
 }
 
@@ -444,8 +527,8 @@ bool app_write_REG_PULSE_ENABLE(void *a)
         pwm.dac0 = false;
 	}
 
-	uint16_t daqValue = (uint16_t)(app_regs.REG_DAC0_VOLTAGE / 5000  * 65535);
-	latch_dac0(daqValue);
+	// uint16_t daqValue = (uint16_t)(app_regs.REG_DAC0_VOLTAGE / 5000  * 65535);
+	// latch_dac0(daqValue);
 
 	if ((reg & B_LED1) && !pwm.dac1)
 	{
@@ -457,8 +540,8 @@ bool app_write_REG_PULSE_ENABLE(void *a)
         pwm.dac1 = false;
 	}
 
-	daqValue = (uint16_t)(app_regs.REG_DAC1_VOLTAGE / 5000  * 65535);
-	latch_dac1(daqValue);
+	// daqValue = (uint16_t)(app_regs.REG_DAC1_VOLTAGE / 5000  * 65535);
+	// latch_dac1(daqValue);
 	
 	app_regs.REG_PULSE_ENABLE = reg;
 	return true;
@@ -609,14 +692,113 @@ bool app_write_REG_RAMP_CONFIG(void *a)
 
 
 /************************************************************************/
-/* REG_RESERVED0                                                        */
+/* REG_PROTOCOL0_DURATION                                               */
 /************************************************************************/
-void app_read_REG_RESERVED0(void)
+void app_read_REG_PROTOCOL0_DURATION(void) {}
+bool app_write_REG_PROTOCOL0_DURATION(void *a)
 {
-	//app_regs.REG_RESERVED0 = 0;
+	uint16_t reg = *((uint16_t*)a);
 
+	app_regs.REG_PROTOCOL0_DURATION = reg;
+	return true;
 }
 
+
+/************************************************************************/
+/* REG_PROTOCOL1_DURATION                                               */
+/************************************************************************/
+void app_read_REG_PROTOCOL1_DURATION(void) {}
+bool app_write_REG_PROTOCOL1_DURATION(void *a)
+{
+	uint16_t reg = *((uint16_t*)a);
+
+	app_regs.REG_PROTOCOL1_DURATION = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PROTOCOL0_DELAY                                                  */
+/************************************************************************/
+void app_read_REG_PROTOCOL0_DELAY(void) {}
+bool app_write_REG_PROTOCOL0_DELAY(void *a)
+{
+	uint16_t reg = *((uint16_t*)a);
+
+	app_regs.REG_PROTOCOL0_DELAY = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_PROTOCOL1_DELAY                                                  */
+/************************************************************************/
+void app_read_REG_PROTOCOL1_DELAY(void) {}
+bool app_write_REG_PROTOCOL1_DELAY(void *a)
+{
+	uint16_t reg = *((uint16_t*)a);
+
+	app_regs.REG_PROTOCOL1_DELAY = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_ENABLE_PROTOCOL                                                  */
+/************************************************************************/
+void app_read_REG_ENABLE_PROTOCOL(void) {}
+bool app_write_REG_ENABLE_PROTOCOL(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_ENABLE_PROTOCOL = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_DISABLE_PROTOCOL                                                 */
+/************************************************************************/
+void app_read_REG_DISABLE_PROTOCOL(void) {}
+bool app_write_REG_DISABLE_PROTOCOL(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_DISABLE_PROTOCOL = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_DI0_TRIGGER                                                      */
+/************************************************************************/
+void app_read_REG_DI0_TRIGGER(void) {}
+bool app_write_REG_DI0_TRIGGER(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_DI0_TRIGGER = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_DI1_TRIGGER                                                      */
+/************************************************************************/
+void app_read_REG_DI1_TRIGGER(void) {}
+bool app_write_REG_DI1_TRIGGER(void *a)
+{
+	uint8_t reg = *((uint8_t*)a);
+
+	app_regs.REG_DI1_TRIGGER = reg;
+	return true;
+}
+
+
+/************************************************************************/
+/* REG_RESERVED0                                                        */
+/************************************************************************/
+void app_read_REG_RESERVED0(void) {}
 bool app_write_REG_RESERVED0(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
@@ -629,12 +811,7 @@ bool app_write_REG_RESERVED0(void *a)
 /************************************************************************/
 /* REG_RESERVED1                                                        */
 /************************************************************************/
-void app_read_REG_RESERVED1(void)
-{
-	//app_regs.REG_RESERVED1 = 0;
-
-}
-
+void app_read_REG_RESERVED1(void) {}
 bool app_write_REG_RESERVED1(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
@@ -647,12 +824,7 @@ bool app_write_REG_RESERVED1(void *a)
 /************************************************************************/
 /* REG_RESERVED2                                                        */
 /************************************************************************/
-void app_read_REG_RESERVED2(void)
-{
-	//app_regs.REG_RESERVED2 = 0;
-
-}
-
+void app_read_REG_RESERVED2(void) {}
 bool app_write_REG_RESERVED2(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
@@ -665,12 +837,7 @@ bool app_write_REG_RESERVED2(void *a)
 /************************************************************************/
 /* REG_RESERVED3                                                        */
 /************************************************************************/
-void app_read_REG_RESERVED3(void)
-{
-	//app_regs.REG_RESERVED3 = 0;
-
-}
-
+void app_read_REG_RESERVED3(void) {}
 bool app_write_REG_RESERVED3(void *a)
 {
 	uint8_t reg = *((uint8_t*)a);
