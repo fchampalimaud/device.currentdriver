@@ -9,7 +9,8 @@
 #include "structs.h"
 
 #define F_CPU 32000000 //need to be defined for delay.h
-#include <util/delay.h>												   
+#include <util/delay.h>
+
 /************************************************************************/
 /* Declare application registers                                        */
 /************************************************************************/
@@ -65,10 +66,8 @@ void core_callback_catastrophic_error_detected(void)
 /************************************************************************/
 /* General definitions                                                  */
 /************************************************************************/
-countdown_t pulse_countdown;
-pulse_timings timings;
-ramp_info ramp;
-protocol_state protocols = {OFF, OFF};
+Protocol protocol0;
+Protocol protocol1;
 
 /************************************************************************/
 /* User functions                                                       */
@@ -100,22 +99,24 @@ void core_callback_1st_config_hw_after_boot(void)
 
 }
 
-void core_callback_reset_registers(void) // TODO
+void core_callback_reset_registers(void)
 {
 	/* Initialize registers */
-	app_regs.REG_DAC0_VOLTAGE = 0;
-	app_regs.REG_DAC1_VOLTAGE = 0;
-	app_regs.REG_LED0_CURRENT = 0;
-	app_regs.REG_LED1_CURRENT = 0;
-	app_regs.REG_LED0_MAX_CURRENT = 100;
-	app_regs.REG_LED1_MAX_CURRENT = 100;
-	app_regs.REG_LED_DISABLE = 0;
-	app_regs.REG_LED_ENABLE = 0;
-	app_regs.REG_LED_OUT = 0;
+	app_regs.REG_PORT_DIS = 0;
 	app_regs.REG_OUTPUTS_SET = 0;
 	app_regs.REG_OUTPUTS_CLEAR = 0;
 	app_regs.REG_OUTPUTS_TOGGLE = 0;
 	app_regs.REG_OUTPUTS_OUT = 0;
+	app_regs.REG_LED_ENABLE = 0;
+	app_regs.REG_LED_DISABLE = 0;
+	app_regs.REG_LED_OUT = 0;
+	app_regs.REG_LED_TARGET_STATE = 0;
+	app_regs.REG_LED0_CURRENT = 0;
+	app_regs.REG_LED1_CURRENT = 0;
+	app_regs.REG_LED0_MAX_CURRENT = 100;
+	app_regs.REG_LED1_MAX_CURRENT = 100;
+	app_regs.REG_DAC0_VOLTAGE = 0;
+	app_regs.REG_DAC1_VOLTAGE = 0;
 	app_regs.REG_PULSE_ENABLE = 0;
 	app_regs.REG_PULSE_DCYCLE_LED0 = 1;
 	app_regs.REG_PULSE_DCYCLE_LED1 = 1;
@@ -123,18 +124,23 @@ void core_callback_reset_registers(void) // TODO
 	app_regs.REG_PULSE_FREQUENCY_LED1 = 1;
 	app_regs.REG_RAMP_LED0 = 1;
 	app_regs.REG_RAMP_LED1 = 1;
-	app_regs.REG_RAMP_CONFIG = 1;
-	app_regs.REG_EVNT_ENABLE = B_EVT_PORT_DIS;
+	app_regs.REG_RAMP_CONFIG = 0;
+	app_regs.REG_PROTOCOL0_DURATION = 0;
+	app_regs.REG_PROTOCOL1_DURATION = 0;
+	app_regs.REG_PROTOCOL0_DELAY = 0;
+	app_regs.REG_PROTOCOL1_DELAY = 0;
+	app_regs.REG_ENABLE_PROTOCOL = 0;
+	app_regs.REG_DISABLE_PROTOCOL = 0;
+	app_regs.REG_DI0_TRIGGER = 0;
+	app_regs.REG_DI1_TRIGGER = 0;
+	app_regs.REG_EVNT_ENABLE = B_EVT_LED_STATE | B_EVT_PORT_DIS;
 	
 }
 
-extern pwm_possibilities_t pwm;
-
 void core_callback_registers_were_reinitialized(void)
 {
-	pwm.dac0 = false;
-    pwm.dac1 = false;
-    // pwm.do0 = false;
+	protocol0.state = OFF;
+	protocol1.state = OFF;
 	
 }
 
@@ -169,85 +175,145 @@ void core_callback_t_after_exec(void) {}
 void core_callback_t_new_second(void) {}
 void core_callback_t_500us(void) 
 {
-	if (pulse_countdown.dac0 > 0)
-	    if (--pulse_countdown.dac0 == 0)
-	    {
-    	    if (pwm.dac0)
-    	    {
-				if (timings.is_on_dac0)
+	if (protocol0.state == DELAY)
+	{
+		if (protocol0.delay == 0 && protocol0.ramps.use_ramps & B_LED0_RISE)
+		{
+			protocol0.state = RISE;
+		} else if (protocol0.delay == 0 && ~(protocol0.ramps.use_ramps & B_LED0_RISE)) {
+			latch_dac0(protocol0.target);
+			protocol0.state = ON;
+		}
+		protocol0.delay--;
+	} else if (protocol0.state == RISE) {
+		if (protocol0.ramps.countdown_rise > 0)
+		{
+			if (protocol0.ramps.remainder_rise > 0) {
+				protocol0.ramps.previous_value += protocol0.ramps.cycle_amount + 1;
+				protocol0.ramps.remainder_rise--;
+			} else {
+				protocol0.ramps.previous_value += protocol0.ramps.cycle_amount;
+			}
+			latch_dac0(protocol0.ramps.previous_value);
+			protocol0.ramps.countdown_rise--;
+		} else {
+			protocol0.state = ON;
+		}
+	} else if (protocol0.state == ON) {
+		if (protocol0.has_duration) {
+			if (protocol0.duration > 0)
+			{
+				protocol0.duration--;
+			} else if (protocol0.ramps.use_ramps & B_LED0_FALL) {
+				protocol0.ramps.previous_value = protocol0.target;
+				protocol0.state = FALL;
+			} else {
+				latch_dac0(0);
+				protocol0.state = OFF;
+			}
+		}
+
+		if (protocol0.pulses.use_pulses)
+		{
+			if (--protocol0.pulses.countdown <= 0)
+			{
+				if (protocol0.pulses.state)
 				{
-					pulse_countdown.dac0 = timings.pwm_off_dac0;
-					timings.is_on_dac0 = false;
+					protocol0.pulses.countdown = protocol0.pulses.time_off;
+					protocol0.pulses.state = false;
 					latch_dac0(0);
 				} else {
-					pulse_countdown.dac0 = timings.pwm_on_dac0;
-					timings.is_on_dac0 = true;
-					latch_dac0((uint16_t)(app_regs.REG_DAC0_VOLTAGE / 5000  * 65535));
+					protocol0.pulses.countdown = protocol0.pulses.time_on;
+					protocol0.pulses.state = true;
+					latch_dac0((uint16_t)(protocol0.target));
 				}
-    	    }
-	    }
-
-	if (pulse_countdown.dac1 > 0)
-	    if (--pulse_countdown.dac1 == 0)
-	    {
-    	    if (pwm.dac1)
-    	    {
-				if (timings.is_on_dac1)
-				{
-					pulse_countdown.dac1 = timings.pwm_off_dac1;
-					timings.is_on_dac1 = false;
-					latch_dac1(0);
-				} else {
-					pulse_countdown.dac1 = timings.pwm_on_dac1;
-					timings.is_on_dac1 = true;
-					latch_dac1((uint16_t)(app_regs.REG_DAC1_VOLTAGE / 5000  * 65535));
-				}
-    	    }
-	    }
-
-	if (pulse_countdown.ramp_dac0 > 0)
-	{
-		pulse_countdown.ramp_dac0--;
-		if (ramp.is_increasing_dac0)
+			}
+		}
+	} else if (protocol0.state == FALL) {
+		if (protocol0.ramps.countdown_fall > 0)
 		{
-	    if (ramp.remainder_dac0 > 0) {
-        	ramp.previous_value_dac0 += ramp.cycle_amount_dac0 + 1;
-        	ramp.remainder_dac0--;
-	    } else {
-        	ramp.previous_value_dac0 += ramp.cycle_amount_dac0;
-	    }
-	    latch_dac0(ramp.previous_value_dac0);
+			if (protocol0.ramps.remainder_fall > 0) {
+				protocol0.ramps.previous_value -= protocol0.ramps.cycle_amount + 1;
+				protocol0.ramps.remainder_fall--;
+			} else {
+				protocol0.ramps.previous_value -= protocol0.ramps.cycle_amount;
+			}
+			latch_dac0(protocol0.ramps.previous_value);
+			protocol0.ramps.countdown_fall--;
 		} else {
-	    if (ramp.remainder_dac0 > 0) {
-        	ramp.previous_value_dac0 -= ramp.cycle_amount_dac0 + 1;
-        	ramp.remainder_dac0--;
-	    } else {
-        	ramp.previous_value_dac0 -= ramp.cycle_amount_dac0;
-	    }
-	    latch_dac0(ramp.previous_value_dac0);
+			latch_dac0(0);
+			protocol0.state = OFF;
 		}
 	}
 
-	if (pulse_countdown.ramp_dac1 > 0)
+	if (protocol1.state == DELAY)
 	{
-		pulse_countdown.ramp_dac1--;
-		if (ramp.is_increasing_dac1)
+		if (protocol1.delay == 0 && protocol1.ramps.use_ramps & B_LED1_RISE)
 		{
-	    if (ramp.remainder_dac1 > 0) {
-        	ramp.previous_value_dac1 += ramp.cycle_amount_dac1 + 1;
-        	ramp.remainder_dac1--;
-	    } else {
-        	ramp.previous_value_dac1 += ramp.cycle_amount_dac1;
-	    }
-	    latch_dac1(ramp.previous_value_dac1);
+			protocol1.state = RISE;
+		} else if (protocol1.delay == 0 && ~(protocol1.ramps.use_ramps & B_LED1_RISE)) {
+			latch_dac1(protocol1.target);
+			protocol1.state = ON;
+		}
+		protocol1.delay--;
+	} else if (protocol1.state == RISE) {
+		if (protocol1.ramps.countdown_rise > 0)
+		{
+			if (protocol1.ramps.remainder_rise > 0) {
+				protocol1.ramps.previous_value += protocol1.ramps.cycle_amount + 1;
+				protocol1.ramps.remainder_rise--;
+			} else {
+				protocol1.ramps.previous_value += protocol1.ramps.cycle_amount;
+			}
+			latch_dac1(protocol1.ramps.previous_value);
+			protocol1.ramps.countdown_rise--;
 		} else {
-	    if (ramp.remainder_dac1 > 0) {
-        	ramp.previous_value_dac1 -= ramp.cycle_amount_dac1 + 1;
-        	ramp.remainder_dac1--;
-	    } else {
-        	ramp.previous_value_dac1 -= ramp.cycle_amount_dac1;
-	    }
-	    latch_dac1(ramp.previous_value_dac1);
+			protocol1.state = ON;
+		}
+	} else if (protocol1.state == ON) {
+		if (protocol1.has_duration) {
+			if (protocol1.duration > 0)
+			{
+				protocol1.duration--;
+			} else if (protocol1.ramps.use_ramps & B_LED1_FALL) {
+				protocol1.ramps.previous_value = protocol1.target;
+				protocol1.state = FALL;
+			} else {
+				latch_dac1(0);
+				protocol1.state = OFF;
+			}
+		}
+
+		if (protocol1.pulses.use_pulses)
+		{
+			if (--protocol1.pulses.countdown <= 0)
+			{
+				if (protocol1.pulses.state)
+				{
+					protocol1.pulses.countdown = protocol1.pulses.time_off;
+					protocol1.pulses.state = false;
+					latch_dac1(0);
+				} else {
+					protocol1.pulses.countdown = protocol1.pulses.time_on;
+					protocol1.pulses.state = true;
+					latch_dac1((uint16_t)(protocol1.target));
+				}
+			}
+		}
+	} else if (protocol1.state == FALL) {
+		if (protocol1.ramps.countdown_fall > 0)
+		{
+			if (protocol1.ramps.remainder_fall > 0) {
+				protocol1.ramps.previous_value -= protocol1.ramps.cycle_amount + 1;
+				protocol1.ramps.remainder_fall--;
+			} else {
+				protocol1.ramps.previous_value -= protocol1.ramps.cycle_amount;
+			}
+			latch_dac1(protocol1.ramps.previous_value);
+			protocol1.ramps.countdown_fall--;
+		} else {
+			latch_dac1(0);
+			protocol1.state = OFF;
 		}
 	}
 }
