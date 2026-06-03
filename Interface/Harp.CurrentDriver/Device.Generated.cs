@@ -42,28 +42,37 @@ namespace Harp.CurrentDriver
             { 34, typeof(OutputClear) },
             { 35, typeof(OutputToggle) },
             { 36, typeof(OutputState) },
-            { 37, typeof(Led0Current) },
-            { 38, typeof(Led1Current) },
-            { 39, typeof(Dac0Voltage) },
-            { 40, typeof(Dac1Voltage) },
-            { 41, typeof(LedEnable) },
-            { 42, typeof(LedDisable) },
-            { 43, typeof(LedState) },
-            { 44, typeof(Led0MaxCurrent) },
-            { 45, typeof(Led1MaxCurrent) },
-            { 46, typeof(PulseEnable) },
-            { 47, typeof(PulseDutyCycleLed0) },
-            { 48, typeof(PulseDutyCycleLed1) },
-            { 49, typeof(PulseFrequencyLed0) },
-            { 50, typeof(PulseFrequencyLed1) },
-            { 51, typeof(RampLed0) },
-            { 52, typeof(RampLed1) },
-            { 53, typeof(RampConfig) },
-            { 54, typeof(Reserved0) },
-            { 55, typeof(Reserved1) },
-            { 56, typeof(Reserved2) },
-            { 57, typeof(Reserved3) },
-            { 58, typeof(EnableEvents) }
+            { 37, typeof(LedEnable) },
+            { 38, typeof(LedDisable) },
+            { 39, typeof(LedState) },
+            { 40, typeof(LedTargetState) },
+            { 41, typeof(Led0Current) },
+            { 42, typeof(Led1Current) },
+            { 43, typeof(Led0MaxCurrent) },
+            { 44, typeof(Led1MaxCurrent) },
+            { 45, typeof(Dac0Voltage) },
+            { 46, typeof(Dac1Voltage) },
+            { 47, typeof(PulseEnable) },
+            { 48, typeof(PulseDutyCycleLed0) },
+            { 49, typeof(PulseDutyCycleLed1) },
+            { 50, typeof(PulseFrequencyLed0) },
+            { 51, typeof(PulseFrequencyLed1) },
+            { 52, typeof(RampLed0) },
+            { 53, typeof(RampLed1) },
+            { 54, typeof(RampConfig) },
+            { 55, typeof(Protocol0Duration) },
+            { 56, typeof(Protocol1Duration) },
+            { 57, typeof(Protocol0Delay) },
+            { 58, typeof(Protocol1Delay) },
+            { 59, typeof(EnableProtocol) },
+            { 60, typeof(DisableProtocol) },
+            { 61, typeof(DI0Trigger) },
+            { 62, typeof(DI1Trigger) },
+            { 63, typeof(Reserved0) },
+            { 64, typeof(Reserved1) },
+            { 65, typeof(Reserved2) },
+            { 66, typeof(Reserved3) },
+            { 67, typeof(EnableEvents) }
         };
 
         /// <summary>
@@ -86,7 +95,7 @@ namespace Harp.CurrentDriver
     /// describing the <see cref="CurrentDriver"/> device registers.
     /// </summary>
     [Description("Returns the contents of the metadata file describing the CurrentDriver device registers.")]
-    public partial class GetMetadata : Source<string>
+    public partial class GetDeviceMetadata : Source<string>
     {
         /// <summary>
         /// Returns an observable sequence with the contents of the metadata file
@@ -124,6 +133,157 @@ namespace Harp.CurrentDriver
     }
 
     /// <summary>
+    /// Represents an operator that writes the sequence of <see cref="CurrentDriver"/>" messages
+    /// to the standard Harp storage format.
+    /// </summary>
+    [DefaultProperty(nameof(Path))]
+    [Description("Writes the sequence of CurrentDriver messages to the standard Harp storage format.")]
+    public partial class DeviceDataWriter : Sink<HarpMessage>, INamedElement
+    {
+        const string BinaryExtension = ".bin";
+        const string MetadataFileName = "device.yml";
+        readonly Bonsai.Harp.MessageWriter writer = new();
+
+        string INamedElement.Name => nameof(CurrentDriver) + "DataWriter";
+
+        /// <summary>
+        /// Gets or sets the relative or absolute path on which to save the message data.
+        /// </summary>
+        [Description("The relative or absolute path of the directory on which to save the message data.")]
+        [Editor("Bonsai.Design.SaveFileNameEditor, Bonsai.Design", DesignTypes.UITypeEditor)]
+        public string Path
+        {
+            get => System.IO.Path.GetDirectoryName(writer.FileName);
+            set => writer.FileName = System.IO.Path.Combine(value, nameof(CurrentDriver) + BinaryExtension);
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether element writing should be buffered. If <see langword="true"/>,
+        /// the write commands will be queued in memory as fast as possible and will be processed
+        /// by the writer in a different thread. Otherwise, writing will be done in the same
+        /// thread in which notifications arrive.
+        /// </summary>
+        [Description("Indicates whether writing should be buffered.")]
+        public bool Buffered
+        {
+            get => writer.Buffered;
+            set => writer.Buffered = value;
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to overwrite the output file if it already exists.
+        /// </summary>
+        [Description("Indicates whether to overwrite the output file if it already exists.")]
+        public bool Overwrite
+        {
+            get => writer.Overwrite;
+            set => writer.Overwrite = value;
+        }
+
+        /// <summary>
+        /// Gets or sets a value specifying how the message filter will use the matching criteria.
+        /// </summary>
+        [Description("Specifies how the message filter will use the matching criteria.")]
+        public FilterType FilterType
+        {
+            get => writer.FilterType;
+            set => writer.FilterType = value;
+        }
+
+        /// <summary>
+        /// Gets or sets a value specifying the expected message type. If no value is
+        /// specified, all messages will be accepted.
+        /// </summary>
+        [Description("Specifies the expected message type. If no value is specified, all messages will be accepted.")]
+        public MessageType? MessageType
+        {
+            get => writer.MessageType;
+            set => writer.MessageType = value;
+        }
+
+        private IObservable<TSource> WriteDeviceMetadata<TSource>(IObservable<TSource> source)
+        {
+            var basePath = Path;
+            if (string.IsNullOrEmpty(basePath))
+                return source;
+
+            var metadataPath = System.IO.Path.Combine(basePath, MetadataFileName);
+            return Observable.Create<TSource>(observer =>
+            {
+                Bonsai.IO.PathHelper.EnsureDirectory(metadataPath);
+                if (System.IO.File.Exists(metadataPath) && !Overwrite)
+                {
+                    throw new System.IO.IOException(string.Format("The file '{0}' already exists.", metadataPath));
+                }
+
+                System.IO.File.WriteAllText(metadataPath, Device.Metadata);
+                return source.SubscribeSafe(observer);
+            });
+        }
+
+        /// <summary>
+        /// Writes each Harp message in the sequence to the specified binary file, and the
+        /// contents of the device metadata file to a separate text file.
+        /// </summary>
+        /// <param name="source">The sequence of messages to write to the file.</param>
+        /// <returns>
+        /// An observable sequence that is identical to the <paramref name="source"/>
+        /// sequence but where there is an additional side effect of writing the
+        /// messages to a raw binary file, and the contents of the device metadata file
+        /// to a separate text file.
+        /// </returns>
+        public override IObservable<HarpMessage> Process(IObservable<HarpMessage> source)
+        {
+            return source.Publish(ps => ps.Merge(
+                WriteDeviceMetadata(writer.Process(ps.GroupBy(message => message.Address)))
+                .IgnoreElements()
+                .Cast<HarpMessage>()));
+        }
+
+        /// <summary>
+        /// Writes each Harp message in the sequence of observable groups to the
+        /// corresponding binary file, where the name of each file is generated from
+        /// the common group register address. The contents of the device metadata file are
+        /// written to a separate text file.
+        /// </summary>
+        /// <param name="source">
+        /// A sequence of observable groups, each of which corresponds to a unique register
+        /// address.
+        /// </param>
+        /// <returns>
+        /// An observable sequence that is identical to the <paramref name="source"/>
+        /// sequence but where there is an additional side effect of writing the Harp
+        /// messages in each group to the corresponding file, and the contents of the device
+        /// metadata file to a separate text file.
+        /// </returns>
+        public IObservable<IGroupedObservable<int, HarpMessage>> Process(IObservable<IGroupedObservable<int, HarpMessage>> source)
+        {
+            return WriteDeviceMetadata(writer.Process(source));
+        }
+
+        /// <summary>
+        /// Writes each Harp message in the sequence of observable groups to the
+        /// corresponding binary file, where the name of each file is generated from
+        /// the common group register name. The contents of the device metadata file are
+        /// written to a separate text file.
+        /// </summary>
+        /// <param name="source">
+        /// A sequence of observable groups, each of which corresponds to a unique register
+        /// type.
+        /// </param>
+        /// <returns>
+        /// An observable sequence that is identical to the <paramref name="source"/>
+        /// sequence but where there is an additional side effect of writing the Harp
+        /// messages in each group to the corresponding file, and the contents of the device
+        /// metadata file to a separate text file.
+        /// </returns>
+        public IObservable<IGroupedObservable<Type, HarpMessage>> Process(IObservable<IGroupedObservable<Type, HarpMessage>> source)
+        {
+            return WriteDeviceMetadata(writer.Process(source));
+        }
+    }
+
+    /// <summary>
     /// Represents an operator that filters register-specific messages
     /// reported by the <see cref="CurrentDriver"/> device.
     /// </summary>
@@ -132,15 +292,16 @@ namespace Harp.CurrentDriver
     /// <seealso cref="OutputClear"/>
     /// <seealso cref="OutputToggle"/>
     /// <seealso cref="OutputState"/>
-    /// <seealso cref="Led0Current"/>
-    /// <seealso cref="Led1Current"/>
-    /// <seealso cref="Dac0Voltage"/>
-    /// <seealso cref="Dac1Voltage"/>
     /// <seealso cref="LedEnable"/>
     /// <seealso cref="LedDisable"/>
     /// <seealso cref="LedState"/>
+    /// <seealso cref="LedTargetState"/>
+    /// <seealso cref="Led0Current"/>
+    /// <seealso cref="Led1Current"/>
     /// <seealso cref="Led0MaxCurrent"/>
     /// <seealso cref="Led1MaxCurrent"/>
+    /// <seealso cref="Dac0Voltage"/>
+    /// <seealso cref="Dac1Voltage"/>
     /// <seealso cref="PulseEnable"/>
     /// <seealso cref="PulseDutyCycleLed0"/>
     /// <seealso cref="PulseDutyCycleLed1"/>
@@ -149,21 +310,30 @@ namespace Harp.CurrentDriver
     /// <seealso cref="RampLed0"/>
     /// <seealso cref="RampLed1"/>
     /// <seealso cref="RampConfig"/>
+    /// <seealso cref="Protocol0Duration"/>
+    /// <seealso cref="Protocol1Duration"/>
+    /// <seealso cref="Protocol0Delay"/>
+    /// <seealso cref="Protocol1Delay"/>
+    /// <seealso cref="EnableProtocol"/>
+    /// <seealso cref="DisableProtocol"/>
+    /// <seealso cref="DI0Trigger"/>
+    /// <seealso cref="DI1Trigger"/>
     /// <seealso cref="EnableEvents"/>
     [XmlInclude(typeof(DigitalInputState))]
     [XmlInclude(typeof(OutputSet))]
     [XmlInclude(typeof(OutputClear))]
     [XmlInclude(typeof(OutputToggle))]
     [XmlInclude(typeof(OutputState))]
-    [XmlInclude(typeof(Led0Current))]
-    [XmlInclude(typeof(Led1Current))]
-    [XmlInclude(typeof(Dac0Voltage))]
-    [XmlInclude(typeof(Dac1Voltage))]
     [XmlInclude(typeof(LedEnable))]
     [XmlInclude(typeof(LedDisable))]
     [XmlInclude(typeof(LedState))]
+    [XmlInclude(typeof(LedTargetState))]
+    [XmlInclude(typeof(Led0Current))]
+    [XmlInclude(typeof(Led1Current))]
     [XmlInclude(typeof(Led0MaxCurrent))]
     [XmlInclude(typeof(Led1MaxCurrent))]
+    [XmlInclude(typeof(Dac0Voltage))]
+    [XmlInclude(typeof(Dac1Voltage))]
     [XmlInclude(typeof(PulseEnable))]
     [XmlInclude(typeof(PulseDutyCycleLed0))]
     [XmlInclude(typeof(PulseDutyCycleLed1))]
@@ -172,6 +342,14 @@ namespace Harp.CurrentDriver
     [XmlInclude(typeof(RampLed0))]
     [XmlInclude(typeof(RampLed1))]
     [XmlInclude(typeof(RampConfig))]
+    [XmlInclude(typeof(Protocol0Duration))]
+    [XmlInclude(typeof(Protocol1Duration))]
+    [XmlInclude(typeof(Protocol0Delay))]
+    [XmlInclude(typeof(Protocol1Delay))]
+    [XmlInclude(typeof(EnableProtocol))]
+    [XmlInclude(typeof(DisableProtocol))]
+    [XmlInclude(typeof(DI0Trigger))]
+    [XmlInclude(typeof(DI1Trigger))]
     [XmlInclude(typeof(EnableEvents))]
     [Description("Filters register-specific messages reported by the CurrentDriver device.")]
     public class FilterRegister : FilterRegisterBuilder, INamedElement
@@ -199,15 +377,16 @@ namespace Harp.CurrentDriver
     /// <seealso cref="OutputClear"/>
     /// <seealso cref="OutputToggle"/>
     /// <seealso cref="OutputState"/>
-    /// <seealso cref="Led0Current"/>
-    /// <seealso cref="Led1Current"/>
-    /// <seealso cref="Dac0Voltage"/>
-    /// <seealso cref="Dac1Voltage"/>
     /// <seealso cref="LedEnable"/>
     /// <seealso cref="LedDisable"/>
     /// <seealso cref="LedState"/>
+    /// <seealso cref="LedTargetState"/>
+    /// <seealso cref="Led0Current"/>
+    /// <seealso cref="Led1Current"/>
     /// <seealso cref="Led0MaxCurrent"/>
     /// <seealso cref="Led1MaxCurrent"/>
+    /// <seealso cref="Dac0Voltage"/>
+    /// <seealso cref="Dac1Voltage"/>
     /// <seealso cref="PulseEnable"/>
     /// <seealso cref="PulseDutyCycleLed0"/>
     /// <seealso cref="PulseDutyCycleLed1"/>
@@ -216,21 +395,30 @@ namespace Harp.CurrentDriver
     /// <seealso cref="RampLed0"/>
     /// <seealso cref="RampLed1"/>
     /// <seealso cref="RampConfig"/>
+    /// <seealso cref="Protocol0Duration"/>
+    /// <seealso cref="Protocol1Duration"/>
+    /// <seealso cref="Protocol0Delay"/>
+    /// <seealso cref="Protocol1Delay"/>
+    /// <seealso cref="EnableProtocol"/>
+    /// <seealso cref="DisableProtocol"/>
+    /// <seealso cref="DI0Trigger"/>
+    /// <seealso cref="DI1Trigger"/>
     /// <seealso cref="EnableEvents"/>
     [XmlInclude(typeof(DigitalInputState))]
     [XmlInclude(typeof(OutputSet))]
     [XmlInclude(typeof(OutputClear))]
     [XmlInclude(typeof(OutputToggle))]
     [XmlInclude(typeof(OutputState))]
-    [XmlInclude(typeof(Led0Current))]
-    [XmlInclude(typeof(Led1Current))]
-    [XmlInclude(typeof(Dac0Voltage))]
-    [XmlInclude(typeof(Dac1Voltage))]
     [XmlInclude(typeof(LedEnable))]
     [XmlInclude(typeof(LedDisable))]
     [XmlInclude(typeof(LedState))]
+    [XmlInclude(typeof(LedTargetState))]
+    [XmlInclude(typeof(Led0Current))]
+    [XmlInclude(typeof(Led1Current))]
     [XmlInclude(typeof(Led0MaxCurrent))]
     [XmlInclude(typeof(Led1MaxCurrent))]
+    [XmlInclude(typeof(Dac0Voltage))]
+    [XmlInclude(typeof(Dac1Voltage))]
     [XmlInclude(typeof(PulseEnable))]
     [XmlInclude(typeof(PulseDutyCycleLed0))]
     [XmlInclude(typeof(PulseDutyCycleLed1))]
@@ -239,21 +427,30 @@ namespace Harp.CurrentDriver
     [XmlInclude(typeof(RampLed0))]
     [XmlInclude(typeof(RampLed1))]
     [XmlInclude(typeof(RampConfig))]
+    [XmlInclude(typeof(Protocol0Duration))]
+    [XmlInclude(typeof(Protocol1Duration))]
+    [XmlInclude(typeof(Protocol0Delay))]
+    [XmlInclude(typeof(Protocol1Delay))]
+    [XmlInclude(typeof(EnableProtocol))]
+    [XmlInclude(typeof(DisableProtocol))]
+    [XmlInclude(typeof(DI0Trigger))]
+    [XmlInclude(typeof(DI1Trigger))]
     [XmlInclude(typeof(EnableEvents))]
     [XmlInclude(typeof(TimestampedDigitalInputState))]
     [XmlInclude(typeof(TimestampedOutputSet))]
     [XmlInclude(typeof(TimestampedOutputClear))]
     [XmlInclude(typeof(TimestampedOutputToggle))]
     [XmlInclude(typeof(TimestampedOutputState))]
-    [XmlInclude(typeof(TimestampedLed0Current))]
-    [XmlInclude(typeof(TimestampedLed1Current))]
-    [XmlInclude(typeof(TimestampedDac0Voltage))]
-    [XmlInclude(typeof(TimestampedDac1Voltage))]
     [XmlInclude(typeof(TimestampedLedEnable))]
     [XmlInclude(typeof(TimestampedLedDisable))]
     [XmlInclude(typeof(TimestampedLedState))]
+    [XmlInclude(typeof(TimestampedLedTargetState))]
+    [XmlInclude(typeof(TimestampedLed0Current))]
+    [XmlInclude(typeof(TimestampedLed1Current))]
     [XmlInclude(typeof(TimestampedLed0MaxCurrent))]
     [XmlInclude(typeof(TimestampedLed1MaxCurrent))]
+    [XmlInclude(typeof(TimestampedDac0Voltage))]
+    [XmlInclude(typeof(TimestampedDac1Voltage))]
     [XmlInclude(typeof(TimestampedPulseEnable))]
     [XmlInclude(typeof(TimestampedPulseDutyCycleLed0))]
     [XmlInclude(typeof(TimestampedPulseDutyCycleLed1))]
@@ -262,6 +459,14 @@ namespace Harp.CurrentDriver
     [XmlInclude(typeof(TimestampedRampLed0))]
     [XmlInclude(typeof(TimestampedRampLed1))]
     [XmlInclude(typeof(TimestampedRampConfig))]
+    [XmlInclude(typeof(TimestampedProtocol0Duration))]
+    [XmlInclude(typeof(TimestampedProtocol1Duration))]
+    [XmlInclude(typeof(TimestampedProtocol0Delay))]
+    [XmlInclude(typeof(TimestampedProtocol1Delay))]
+    [XmlInclude(typeof(TimestampedEnableProtocol))]
+    [XmlInclude(typeof(TimestampedDisableProtocol))]
+    [XmlInclude(typeof(TimestampedDI0Trigger))]
+    [XmlInclude(typeof(TimestampedDI1Trigger))]
     [XmlInclude(typeof(TimestampedEnableEvents))]
     [Description("Filters and selects specific messages reported by the CurrentDriver device.")]
     public partial class Parse : ParseBuilder, INamedElement
@@ -286,15 +491,16 @@ namespace Harp.CurrentDriver
     /// <seealso cref="OutputClear"/>
     /// <seealso cref="OutputToggle"/>
     /// <seealso cref="OutputState"/>
-    /// <seealso cref="Led0Current"/>
-    /// <seealso cref="Led1Current"/>
-    /// <seealso cref="Dac0Voltage"/>
-    /// <seealso cref="Dac1Voltage"/>
     /// <seealso cref="LedEnable"/>
     /// <seealso cref="LedDisable"/>
     /// <seealso cref="LedState"/>
+    /// <seealso cref="LedTargetState"/>
+    /// <seealso cref="Led0Current"/>
+    /// <seealso cref="Led1Current"/>
     /// <seealso cref="Led0MaxCurrent"/>
     /// <seealso cref="Led1MaxCurrent"/>
+    /// <seealso cref="Dac0Voltage"/>
+    /// <seealso cref="Dac1Voltage"/>
     /// <seealso cref="PulseEnable"/>
     /// <seealso cref="PulseDutyCycleLed0"/>
     /// <seealso cref="PulseDutyCycleLed1"/>
@@ -303,21 +509,30 @@ namespace Harp.CurrentDriver
     /// <seealso cref="RampLed0"/>
     /// <seealso cref="RampLed1"/>
     /// <seealso cref="RampConfig"/>
+    /// <seealso cref="Protocol0Duration"/>
+    /// <seealso cref="Protocol1Duration"/>
+    /// <seealso cref="Protocol0Delay"/>
+    /// <seealso cref="Protocol1Delay"/>
+    /// <seealso cref="EnableProtocol"/>
+    /// <seealso cref="DisableProtocol"/>
+    /// <seealso cref="DI0Trigger"/>
+    /// <seealso cref="DI1Trigger"/>
     /// <seealso cref="EnableEvents"/>
     [XmlInclude(typeof(DigitalInputState))]
     [XmlInclude(typeof(OutputSet))]
     [XmlInclude(typeof(OutputClear))]
     [XmlInclude(typeof(OutputToggle))]
     [XmlInclude(typeof(OutputState))]
-    [XmlInclude(typeof(Led0Current))]
-    [XmlInclude(typeof(Led1Current))]
-    [XmlInclude(typeof(Dac0Voltage))]
-    [XmlInclude(typeof(Dac1Voltage))]
     [XmlInclude(typeof(LedEnable))]
     [XmlInclude(typeof(LedDisable))]
     [XmlInclude(typeof(LedState))]
+    [XmlInclude(typeof(LedTargetState))]
+    [XmlInclude(typeof(Led0Current))]
+    [XmlInclude(typeof(Led1Current))]
     [XmlInclude(typeof(Led0MaxCurrent))]
     [XmlInclude(typeof(Led1MaxCurrent))]
+    [XmlInclude(typeof(Dac0Voltage))]
+    [XmlInclude(typeof(Dac1Voltage))]
     [XmlInclude(typeof(PulseEnable))]
     [XmlInclude(typeof(PulseDutyCycleLed0))]
     [XmlInclude(typeof(PulseDutyCycleLed1))]
@@ -326,6 +541,14 @@ namespace Harp.CurrentDriver
     [XmlInclude(typeof(RampLed0))]
     [XmlInclude(typeof(RampLed1))]
     [XmlInclude(typeof(RampConfig))]
+    [XmlInclude(typeof(Protocol0Duration))]
+    [XmlInclude(typeof(Protocol1Duration))]
+    [XmlInclude(typeof(Protocol0Delay))]
+    [XmlInclude(typeof(Protocol1Delay))]
+    [XmlInclude(typeof(EnableProtocol))]
+    [XmlInclude(typeof(DisableProtocol))]
+    [XmlInclude(typeof(DI0Trigger))]
+    [XmlInclude(typeof(DI1Trigger))]
     [XmlInclude(typeof(EnableEvents))]
     [Description("Formats a sequence of values as specific CurrentDriver register messages.")]
     public partial class Format : FormatBuilder, INamedElement
@@ -452,7 +675,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the payload type of the <see cref="OutputSet"/> register. This field is constant.
         /// </summary>
-        public const PayloadType RegisterType = PayloadType.U16;
+        public const PayloadType RegisterType = PayloadType.U8;
 
         /// <summary>
         /// Represents the length of the <see cref="OutputSet"/> register. This field is constant.
@@ -466,7 +689,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the message payload.</returns>
         public static DigitalOutputs GetPayload(HarpMessage message)
         {
-            return (DigitalOutputs)message.GetPayloadUInt16();
+            return (DigitalOutputs)message.GetPayloadByte();
         }
 
         /// <summary>
@@ -476,7 +699,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the timestamped message payload.</returns>
         public static Timestamped<DigitalOutputs> GetTimestampedPayload(HarpMessage message)
         {
-            var payload = message.GetTimestampedPayloadUInt16();
+            var payload = message.GetTimestampedPayloadByte();
             return Timestamped.Create((DigitalOutputs)payload.Value, payload.Seconds);
         }
 
@@ -491,7 +714,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
         }
 
         /// <summary>
@@ -507,7 +730,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(double timestamp, MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, timestamp, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
         }
     }
 
@@ -549,7 +772,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the payload type of the <see cref="OutputClear"/> register. This field is constant.
         /// </summary>
-        public const PayloadType RegisterType = PayloadType.U16;
+        public const PayloadType RegisterType = PayloadType.U8;
 
         /// <summary>
         /// Represents the length of the <see cref="OutputClear"/> register. This field is constant.
@@ -563,7 +786,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the message payload.</returns>
         public static DigitalOutputs GetPayload(HarpMessage message)
         {
-            return (DigitalOutputs)message.GetPayloadUInt16();
+            return (DigitalOutputs)message.GetPayloadByte();
         }
 
         /// <summary>
@@ -573,7 +796,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the timestamped message payload.</returns>
         public static Timestamped<DigitalOutputs> GetTimestampedPayload(HarpMessage message)
         {
-            var payload = message.GetTimestampedPayloadUInt16();
+            var payload = message.GetTimestampedPayloadByte();
             return Timestamped.Create((DigitalOutputs)payload.Value, payload.Seconds);
         }
 
@@ -588,7 +811,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
         }
 
         /// <summary>
@@ -604,7 +827,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(double timestamp, MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, timestamp, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
         }
     }
 
@@ -646,7 +869,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the payload type of the <see cref="OutputToggle"/> register. This field is constant.
         /// </summary>
-        public const PayloadType RegisterType = PayloadType.U16;
+        public const PayloadType RegisterType = PayloadType.U8;
 
         /// <summary>
         /// Represents the length of the <see cref="OutputToggle"/> register. This field is constant.
@@ -660,7 +883,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the message payload.</returns>
         public static DigitalOutputs GetPayload(HarpMessage message)
         {
-            return (DigitalOutputs)message.GetPayloadUInt16();
+            return (DigitalOutputs)message.GetPayloadByte();
         }
 
         /// <summary>
@@ -670,7 +893,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the timestamped message payload.</returns>
         public static Timestamped<DigitalOutputs> GetTimestampedPayload(HarpMessage message)
         {
-            var payload = message.GetTimestampedPayloadUInt16();
+            var payload = message.GetTimestampedPayloadByte();
             return Timestamped.Create((DigitalOutputs)payload.Value, payload.Seconds);
         }
 
@@ -685,7 +908,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
         }
 
         /// <summary>
@@ -701,7 +924,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(double timestamp, MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, timestamp, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
         }
     }
 
@@ -743,7 +966,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the payload type of the <see cref="OutputState"/> register. This field is constant.
         /// </summary>
-        public const PayloadType RegisterType = PayloadType.U16;
+        public const PayloadType RegisterType = PayloadType.U8;
 
         /// <summary>
         /// Represents the length of the <see cref="OutputState"/> register. This field is constant.
@@ -757,7 +980,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the message payload.</returns>
         public static DigitalOutputs GetPayload(HarpMessage message)
         {
-            return (DigitalOutputs)message.GetPayloadUInt16();
+            return (DigitalOutputs)message.GetPayloadByte();
         }
 
         /// <summary>
@@ -767,7 +990,7 @@ namespace Harp.CurrentDriver
         /// <returns>A value representing the timestamped message payload.</returns>
         public static Timestamped<DigitalOutputs> GetTimestampedPayload(HarpMessage message)
         {
-            var payload = message.GetTimestampedPayloadUInt16();
+            var payload = message.GetTimestampedPayloadByte();
             return Timestamped.Create((DigitalOutputs)payload.Value, payload.Seconds);
         }
 
@@ -782,7 +1005,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
         }
 
         /// <summary>
@@ -798,7 +1021,7 @@ namespace Harp.CurrentDriver
         /// </returns>
         public static HarpMessage FromPayload(double timestamp, MessageType messageType, DigitalOutputs value)
         {
-            return HarpMessage.FromUInt16(Address, timestamp, messageType, (ushort)value);
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
         }
     }
 
@@ -827,390 +1050,6 @@ namespace Harp.CurrentDriver
     }
 
     /// <summary>
-    /// Represents a register that configuration of current to drive LED 0 [0:1000] mA.
-    /// </summary>
-    [Description("Configuration of current to drive LED 0 [0:1000] mA")]
-    public partial class Led0Current
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Led0Current"/> register. This field is constant.
-        /// </summary>
-        public const int Address = 37;
-
-        /// <summary>
-        /// Represents the payload type of the <see cref="Led0Current"/> register. This field is constant.
-        /// </summary>
-        public const PayloadType RegisterType = PayloadType.Float;
-
-        /// <summary>
-        /// Represents the length of the <see cref="Led0Current"/> register. This field is constant.
-        /// </summary>
-        public const int RegisterLength = 1;
-
-        /// <summary>
-        /// Returns the payload data for <see cref="Led0Current"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the message payload.</returns>
-        public static float GetPayload(HarpMessage message)
-        {
-            return message.GetPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns the timestamped payload data for <see cref="Led0Current"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
-        {
-            return message.GetTimestampedPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns a Harp message for the <see cref="Led0Current"/> register.
-        /// </summary>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Led0Current"/> register
-        /// with the specified message type and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, messageType, value);
-        }
-
-        /// <summary>
-        /// Returns a timestamped Harp message for the <see cref="Led0Current"/>
-        /// register.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Led0Current"/> register
-        /// with the specified message type, timestamp, and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
-        }
-    }
-
-    /// <summary>
-    /// Provides methods for manipulating timestamped messages from the
-    /// Led0Current register.
-    /// </summary>
-    /// <seealso cref="Led0Current"/>
-    [Description("Filters and selects timestamped messages from the Led0Current register.")]
-    public partial class TimestampedLed0Current
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Led0Current"/> register. This field is constant.
-        /// </summary>
-        public const int Address = Led0Current.Address;
-
-        /// <summary>
-        /// Returns timestamped payload data for <see cref="Led0Current"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetPayload(HarpMessage message)
-        {
-            return Led0Current.GetTimestampedPayload(message);
-        }
-    }
-
-    /// <summary>
-    /// Represents a register that configuration of current to drive LED 1 [0:1000] mA.
-    /// </summary>
-    [Description("Configuration of current to drive LED 1 [0:1000] mA")]
-    public partial class Led1Current
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Led1Current"/> register. This field is constant.
-        /// </summary>
-        public const int Address = 38;
-
-        /// <summary>
-        /// Represents the payload type of the <see cref="Led1Current"/> register. This field is constant.
-        /// </summary>
-        public const PayloadType RegisterType = PayloadType.Float;
-
-        /// <summary>
-        /// Represents the length of the <see cref="Led1Current"/> register. This field is constant.
-        /// </summary>
-        public const int RegisterLength = 1;
-
-        /// <summary>
-        /// Returns the payload data for <see cref="Led1Current"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the message payload.</returns>
-        public static float GetPayload(HarpMessage message)
-        {
-            return message.GetPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns the timestamped payload data for <see cref="Led1Current"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
-        {
-            return message.GetTimestampedPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns a Harp message for the <see cref="Led1Current"/> register.
-        /// </summary>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Led1Current"/> register
-        /// with the specified message type and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, messageType, value);
-        }
-
-        /// <summary>
-        /// Returns a timestamped Harp message for the <see cref="Led1Current"/>
-        /// register.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Led1Current"/> register
-        /// with the specified message type, timestamp, and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
-        }
-    }
-
-    /// <summary>
-    /// Provides methods for manipulating timestamped messages from the
-    /// Led1Current register.
-    /// </summary>
-    /// <seealso cref="Led1Current"/>
-    [Description("Filters and selects timestamped messages from the Led1Current register.")]
-    public partial class TimestampedLed1Current
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Led1Current"/> register. This field is constant.
-        /// </summary>
-        public const int Address = Led1Current.Address;
-
-        /// <summary>
-        /// Returns timestamped payload data for <see cref="Led1Current"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetPayload(HarpMessage message)
-        {
-            return Led1Current.GetTimestampedPayload(message);
-        }
-    }
-
-    /// <summary>
-    /// Represents a register that configuration of DAC 0 voltage [0:5000] mV.
-    /// </summary>
-    [Description("Configuration of DAC 0 voltage [0:5000] mV")]
-    public partial class Dac0Voltage
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Dac0Voltage"/> register. This field is constant.
-        /// </summary>
-        public const int Address = 39;
-
-        /// <summary>
-        /// Represents the payload type of the <see cref="Dac0Voltage"/> register. This field is constant.
-        /// </summary>
-        public const PayloadType RegisterType = PayloadType.Float;
-
-        /// <summary>
-        /// Represents the length of the <see cref="Dac0Voltage"/> register. This field is constant.
-        /// </summary>
-        public const int RegisterLength = 1;
-
-        /// <summary>
-        /// Returns the payload data for <see cref="Dac0Voltage"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the message payload.</returns>
-        public static float GetPayload(HarpMessage message)
-        {
-            return message.GetPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns the timestamped payload data for <see cref="Dac0Voltage"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
-        {
-            return message.GetTimestampedPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns a Harp message for the <see cref="Dac0Voltage"/> register.
-        /// </summary>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Dac0Voltage"/> register
-        /// with the specified message type and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, messageType, value);
-        }
-
-        /// <summary>
-        /// Returns a timestamped Harp message for the <see cref="Dac0Voltage"/>
-        /// register.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Dac0Voltage"/> register
-        /// with the specified message type, timestamp, and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
-        }
-    }
-
-    /// <summary>
-    /// Provides methods for manipulating timestamped messages from the
-    /// Dac0Voltage register.
-    /// </summary>
-    /// <seealso cref="Dac0Voltage"/>
-    [Description("Filters and selects timestamped messages from the Dac0Voltage register.")]
-    public partial class TimestampedDac0Voltage
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Dac0Voltage"/> register. This field is constant.
-        /// </summary>
-        public const int Address = Dac0Voltage.Address;
-
-        /// <summary>
-        /// Returns timestamped payload data for <see cref="Dac0Voltage"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetPayload(HarpMessage message)
-        {
-            return Dac0Voltage.GetTimestampedPayload(message);
-        }
-    }
-
-    /// <summary>
-    /// Represents a register that configuration of DAC 1 voltage [0:5000] mV.
-    /// </summary>
-    [Description("Configuration of DAC 1 voltage [0:5000] mV")]
-    public partial class Dac1Voltage
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Dac1Voltage"/> register. This field is constant.
-        /// </summary>
-        public const int Address = 40;
-
-        /// <summary>
-        /// Represents the payload type of the <see cref="Dac1Voltage"/> register. This field is constant.
-        /// </summary>
-        public const PayloadType RegisterType = PayloadType.Float;
-
-        /// <summary>
-        /// Represents the length of the <see cref="Dac1Voltage"/> register. This field is constant.
-        /// </summary>
-        public const int RegisterLength = 1;
-
-        /// <summary>
-        /// Returns the payload data for <see cref="Dac1Voltage"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the message payload.</returns>
-        public static float GetPayload(HarpMessage message)
-        {
-            return message.GetPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns the timestamped payload data for <see cref="Dac1Voltage"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
-        {
-            return message.GetTimestampedPayloadSingle();
-        }
-
-        /// <summary>
-        /// Returns a Harp message for the <see cref="Dac1Voltage"/> register.
-        /// </summary>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Dac1Voltage"/> register
-        /// with the specified message type and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, messageType, value);
-        }
-
-        /// <summary>
-        /// Returns a timestamped Harp message for the <see cref="Dac1Voltage"/>
-        /// register.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">The type of the Harp message.</param>
-        /// <param name="value">The value to be stored in the message payload.</param>
-        /// <returns>
-        /// A <see cref="HarpMessage"/> object for the <see cref="Dac1Voltage"/> register
-        /// with the specified message type, timestamp, and payload.
-        /// </returns>
-        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
-        {
-            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
-        }
-    }
-
-    /// <summary>
-    /// Provides methods for manipulating timestamped messages from the
-    /// Dac1Voltage register.
-    /// </summary>
-    /// <seealso cref="Dac1Voltage"/>
-    [Description("Filters and selects timestamped messages from the Dac1Voltage register.")]
-    public partial class TimestampedDac1Voltage
-    {
-        /// <summary>
-        /// Represents the address of the <see cref="Dac1Voltage"/> register. This field is constant.
-        /// </summary>
-        public const int Address = Dac1Voltage.Address;
-
-        /// <summary>
-        /// Returns timestamped payload data for <see cref="Dac1Voltage"/> register messages.
-        /// </summary>
-        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
-        /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<float> GetPayload(HarpMessage message)
-        {
-            return Dac1Voltage.GetTimestampedPayload(message);
-        }
-    }
-
-    /// <summary>
     /// Represents a register that enable driver on the selected output.
     /// </summary>
     [Description("Enable driver on the selected output")]
@@ -1219,7 +1058,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="LedEnable"/> register. This field is constant.
         /// </summary>
-        public const int Address = 41;
+        public const int Address = 37;
 
         /// <summary>
         /// Represents the payload type of the <see cref="LedEnable"/> register. This field is constant.
@@ -1316,7 +1155,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="LedDisable"/> register. This field is constant.
         /// </summary>
-        public const int Address = 42;
+        public const int Address = 38;
 
         /// <summary>
         /// Represents the payload type of the <see cref="LedDisable"/> register. This field is constant.
@@ -1405,15 +1244,15 @@ namespace Harp.CurrentDriver
     }
 
     /// <summary>
-    /// Represents a register that control the correspondent LED output.
+    /// Represents a register that control the respective LED output.
     /// </summary>
-    [Description("Control the correspondent LED output")]
+    [Description("Control the respective LED output")]
     public partial class LedState
     {
         /// <summary>
         /// Represents the address of the <see cref="LedState"/> register. This field is constant.
         /// </summary>
-        public const int Address = 43;
+        public const int Address = 39;
 
         /// <summary>
         /// Represents the payload type of the <see cref="LedState"/> register. This field is constant.
@@ -1502,6 +1341,295 @@ namespace Harp.CurrentDriver
     }
 
     /// <summary>
+    /// Represents a register that sends an event when the LED reaches the target value.
+    /// </summary>
+    [Description("Sends an event when the LED reaches the target value")]
+    public partial class LedTargetState
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="LedTargetState"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 40;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="LedTargetState"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U8;
+
+        /// <summary>
+        /// Represents the length of the <see cref="LedTargetState"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="LedTargetState"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static LedOutputs GetPayload(HarpMessage message)
+        {
+            return (LedOutputs)message.GetPayloadByte();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="LedTargetState"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<LedOutputs> GetTimestampedPayload(HarpMessage message)
+        {
+            var payload = message.GetTimestampedPayloadByte();
+            return Timestamped.Create((LedOutputs)payload.Value, payload.Seconds);
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="LedTargetState"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="LedTargetState"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, LedOutputs value)
+        {
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="LedTargetState"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="LedTargetState"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, LedOutputs value)
+        {
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// LedTargetState register.
+    /// </summary>
+    /// <seealso cref="LedTargetState"/>
+    [Description("Filters and selects timestamped messages from the LedTargetState register.")]
+    public partial class TimestampedLedTargetState
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="LedTargetState"/> register. This field is constant.
+        /// </summary>
+        public const int Address = LedTargetState.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="LedTargetState"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<LedOutputs> GetPayload(HarpMessage message)
+        {
+            return LedTargetState.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that configuration of current to drive LED 0 [0:1000] mA.
+    /// </summary>
+    [Description("Configuration of current to drive LED 0 [0:1000] mA")]
+    public partial class Led0Current
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Led0Current"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 41;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Led0Current"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.Float;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Led0Current"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Led0Current"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static float GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Led0Current"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Led0Current"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Led0Current"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Led0Current"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Led0Current"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Led0Current register.
+    /// </summary>
+    /// <seealso cref="Led0Current"/>
+    [Description("Filters and selects timestamped messages from the Led0Current register.")]
+    public partial class TimestampedLed0Current
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Led0Current"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Led0Current.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Led0Current"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetPayload(HarpMessage message)
+        {
+            return Led0Current.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that configuration of current to drive LED 1 [0:1000] mA.
+    /// </summary>
+    [Description("Configuration of current to drive LED 1 [0:1000] mA")]
+    public partial class Led1Current
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Led1Current"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 42;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Led1Current"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.Float;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Led1Current"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Led1Current"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static float GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Led1Current"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Led1Current"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Led1Current"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Led1Current"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Led1Current"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Led1Current register.
+    /// </summary>
+    /// <seealso cref="Led1Current"/>
+    [Description("Filters and selects timestamped messages from the Led1Current register.")]
+    public partial class TimestampedLed1Current
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Led1Current"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Led1Current.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Led1Current"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetPayload(HarpMessage message)
+        {
+            return Led1Current.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
     /// Represents a register that configuration of current to drive LED 0 [0:1000] mA.
     /// </summary>
     [Description("Configuration of current to drive LED 0 [0:1000] mA")]
@@ -1510,7 +1638,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="Led0MaxCurrent"/> register. This field is constant.
         /// </summary>
-        public const int Address = 44;
+        public const int Address = 43;
 
         /// <summary>
         /// Represents the payload type of the <see cref="Led0MaxCurrent"/> register. This field is constant.
@@ -1606,7 +1734,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="Led1MaxCurrent"/> register. This field is constant.
         /// </summary>
-        public const int Address = 45;
+        public const int Address = 44;
 
         /// <summary>
         /// Represents the payload type of the <see cref="Led1MaxCurrent"/> register. This field is constant.
@@ -1694,6 +1822,198 @@ namespace Harp.CurrentDriver
     }
 
     /// <summary>
+    /// Represents a register that configuration of DAC 0 voltage [0:5000] mV.
+    /// </summary>
+    [Description("Configuration of DAC 0 voltage [0:5000] mV")]
+    public partial class Dac0Voltage
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Dac0Voltage"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 45;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Dac0Voltage"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.Float;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Dac0Voltage"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Dac0Voltage"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static float GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Dac0Voltage"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Dac0Voltage"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Dac0Voltage"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Dac0Voltage"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Dac0Voltage"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Dac0Voltage register.
+    /// </summary>
+    /// <seealso cref="Dac0Voltage"/>
+    [Description("Filters and selects timestamped messages from the Dac0Voltage register.")]
+    public partial class TimestampedDac0Voltage
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Dac0Voltage"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Dac0Voltage.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Dac0Voltage"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetPayload(HarpMessage message)
+        {
+            return Dac0Voltage.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that configuration of DAC 1 voltage [0:5000] mV.
+    /// </summary>
+    [Description("Configuration of DAC 1 voltage [0:5000] mV")]
+    public partial class Dac1Voltage
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Dac1Voltage"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 46;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Dac1Voltage"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.Float;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Dac1Voltage"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Dac1Voltage"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static float GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Dac1Voltage"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadSingle();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Dac1Voltage"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Dac1Voltage"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Dac1Voltage"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Dac1Voltage"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, float value)
+        {
+            return HarpMessage.FromSingle(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Dac1Voltage register.
+    /// </summary>
+    /// <seealso cref="Dac1Voltage"/>
+    [Description("Filters and selects timestamped messages from the Dac1Voltage register.")]
+    public partial class TimestampedDac1Voltage
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Dac1Voltage"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Dac1Voltage.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Dac1Voltage"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<float> GetPayload(HarpMessage message)
+        {
+            return Dac1Voltage.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
     /// Represents a register that enables the pulse function for the specified output DACs/LEDs.
     /// </summary>
     [Description("Enables the pulse function for the specified output DACs/LEDs")]
@@ -1702,7 +2022,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="PulseEnable"/> register. This field is constant.
         /// </summary>
-        public const int Address = 46;
+        public const int Address = 47;
 
         /// <summary>
         /// Represents the payload type of the <see cref="PulseEnable"/> register. This field is constant.
@@ -1799,7 +2119,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="PulseDutyCycleLed0"/> register. This field is constant.
         /// </summary>
-        public const int Address = 47;
+        public const int Address = 48;
 
         /// <summary>
         /// Represents the payload type of the <see cref="PulseDutyCycleLed0"/> register. This field is constant.
@@ -1895,7 +2215,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="PulseDutyCycleLed1"/> register. This field is constant.
         /// </summary>
-        public const int Address = 48;
+        public const int Address = 49;
 
         /// <summary>
         /// Represents the payload type of the <see cref="PulseDutyCycleLed1"/> register. This field is constant.
@@ -1991,7 +2311,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="PulseFrequencyLed0"/> register. This field is constant.
         /// </summary>
-        public const int Address = 49;
+        public const int Address = 50;
 
         /// <summary>
         /// Represents the payload type of the <see cref="PulseFrequencyLed0"/> register. This field is constant.
@@ -2087,7 +2407,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="PulseFrequencyLed1"/> register. This field is constant.
         /// </summary>
-        public const int Address = 50;
+        public const int Address = 51;
 
         /// <summary>
         /// Represents the payload type of the <see cref="PulseFrequencyLed1"/> register. This field is constant.
@@ -2183,7 +2503,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="RampLed0"/> register. This field is constant.
         /// </summary>
-        public const int Address = 51;
+        public const int Address = 52;
 
         /// <summary>
         /// Represents the payload type of the <see cref="RampLed0"/> register. This field is constant.
@@ -2279,7 +2599,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="RampLed1"/> register. This field is constant.
         /// </summary>
-        public const int Address = 52;
+        public const int Address = 53;
 
         /// <summary>
         /// Represents the payload type of the <see cref="RampLed1"/> register. This field is constant.
@@ -2375,7 +2695,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="RampConfig"/> register. This field is constant.
         /// </summary>
-        public const int Address = 53;
+        public const int Address = 54;
 
         /// <summary>
         /// Represents the payload type of the <see cref="RampConfig"/> register. This field is constant.
@@ -2464,6 +2784,778 @@ namespace Harp.CurrentDriver
     }
 
     /// <summary>
+    /// Represents a register that specifies the duration of LED0 protocol.
+    /// </summary>
+    [Description("Specifies the duration of LED0 protocol")]
+    public partial class Protocol0Duration
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol0Duration"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 55;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Protocol0Duration"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U16;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Protocol0Duration"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Protocol0Duration"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static ushort GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Protocol0Duration"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Protocol0Duration"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol0Duration"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Protocol0Duration"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol0Duration"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Protocol0Duration register.
+    /// </summary>
+    /// <seealso cref="Protocol0Duration"/>
+    [Description("Filters and selects timestamped messages from the Protocol0Duration register.")]
+    public partial class TimestampedProtocol0Duration
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol0Duration"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Protocol0Duration.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Protocol0Duration"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetPayload(HarpMessage message)
+        {
+            return Protocol0Duration.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that specifies the duration of LED1 protocol.
+    /// </summary>
+    [Description("Specifies the duration of LED1 protocol")]
+    public partial class Protocol1Duration
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol1Duration"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 56;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Protocol1Duration"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U16;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Protocol1Duration"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Protocol1Duration"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static ushort GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Protocol1Duration"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Protocol1Duration"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol1Duration"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Protocol1Duration"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol1Duration"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Protocol1Duration register.
+    /// </summary>
+    /// <seealso cref="Protocol1Duration"/>
+    [Description("Filters and selects timestamped messages from the Protocol1Duration register.")]
+    public partial class TimestampedProtocol1Duration
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol1Duration"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Protocol1Duration.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Protocol1Duration"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetPayload(HarpMessage message)
+        {
+            return Protocol1Duration.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that specifies the delay of the LED0 protocol.
+    /// </summary>
+    [Description("Specifies the delay of the LED0 protocol")]
+    public partial class Protocol0Delay
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol0Delay"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 57;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Protocol0Delay"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U16;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Protocol0Delay"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Protocol0Delay"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static ushort GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Protocol0Delay"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Protocol0Delay"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol0Delay"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Protocol0Delay"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol0Delay"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Protocol0Delay register.
+    /// </summary>
+    /// <seealso cref="Protocol0Delay"/>
+    [Description("Filters and selects timestamped messages from the Protocol0Delay register.")]
+    public partial class TimestampedProtocol0Delay
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol0Delay"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Protocol0Delay.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Protocol0Delay"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetPayload(HarpMessage message)
+        {
+            return Protocol0Delay.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that specifies the delay of the LED1 protocol.
+    /// </summary>
+    [Description("Specifies the delay of the LED1 protocol")]
+    public partial class Protocol1Delay
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol1Delay"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 58;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="Protocol1Delay"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U16;
+
+        /// <summary>
+        /// Represents the length of the <see cref="Protocol1Delay"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="Protocol1Delay"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static ushort GetPayload(HarpMessage message)
+        {
+            return message.GetPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="Protocol1Delay"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetTimestampedPayload(HarpMessage message)
+        {
+            return message.GetTimestampedPayloadUInt16();
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="Protocol1Delay"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol1Delay"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, messageType, value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="Protocol1Delay"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="Protocol1Delay"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, ushort value)
+        {
+            return HarpMessage.FromUInt16(Address, timestamp, messageType, value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// Protocol1Delay register.
+    /// </summary>
+    /// <seealso cref="Protocol1Delay"/>
+    [Description("Filters and selects timestamped messages from the Protocol1Delay register.")]
+    public partial class TimestampedProtocol1Delay
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="Protocol1Delay"/> register. This field is constant.
+        /// </summary>
+        public const int Address = Protocol1Delay.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="Protocol1Delay"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<ushort> GetPayload(HarpMessage message)
+        {
+            return Protocol1Delay.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that enable the respective protocol.
+    /// </summary>
+    [Description("Enable the respective protocol")]
+    public partial class EnableProtocol
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="EnableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 59;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="EnableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U8;
+
+        /// <summary>
+        /// Represents the length of the <see cref="EnableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="EnableProtocol"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static LedOutputs GetPayload(HarpMessage message)
+        {
+            return (LedOutputs)message.GetPayloadByte();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="EnableProtocol"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<LedOutputs> GetTimestampedPayload(HarpMessage message)
+        {
+            var payload = message.GetTimestampedPayloadByte();
+            return Timestamped.Create((LedOutputs)payload.Value, payload.Seconds);
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="EnableProtocol"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="EnableProtocol"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, LedOutputs value)
+        {
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="EnableProtocol"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="EnableProtocol"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, LedOutputs value)
+        {
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// EnableProtocol register.
+    /// </summary>
+    /// <seealso cref="EnableProtocol"/>
+    [Description("Filters and selects timestamped messages from the EnableProtocol register.")]
+    public partial class TimestampedEnableProtocol
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="EnableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const int Address = EnableProtocol.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="EnableProtocol"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<LedOutputs> GetPayload(HarpMessage message)
+        {
+            return EnableProtocol.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that disable the respective protocol.
+    /// </summary>
+    [Description("Disable the respective protocol")]
+    public partial class DisableProtocol
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="DisableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 60;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="DisableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U8;
+
+        /// <summary>
+        /// Represents the length of the <see cref="DisableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="DisableProtocol"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static LedOutputs GetPayload(HarpMessage message)
+        {
+            return (LedOutputs)message.GetPayloadByte();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="DisableProtocol"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<LedOutputs> GetTimestampedPayload(HarpMessage message)
+        {
+            var payload = message.GetTimestampedPayloadByte();
+            return Timestamped.Create((LedOutputs)payload.Value, payload.Seconds);
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="DisableProtocol"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="DisableProtocol"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, LedOutputs value)
+        {
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="DisableProtocol"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="DisableProtocol"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, LedOutputs value)
+        {
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// DisableProtocol register.
+    /// </summary>
+    /// <seealso cref="DisableProtocol"/>
+    [Description("Filters and selects timestamped messages from the DisableProtocol register.")]
+    public partial class TimestampedDisableProtocol
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="DisableProtocol"/> register. This field is constant.
+        /// </summary>
+        public const int Address = DisableProtocol.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="DisableProtocol"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<LedOutputs> GetPayload(HarpMessage message)
+        {
+            return DisableProtocol.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that configures the callback function triggered when DI0 is triggered.
+    /// </summary>
+    [Description("Configures the callback function triggered when DI0 is triggered")]
+    public partial class DI0Trigger
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="DI0Trigger"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 61;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="DI0Trigger"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U8;
+
+        /// <summary>
+        /// Represents the length of the <see cref="DI0Trigger"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="DI0Trigger"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static DITriggerConfig GetPayload(HarpMessage message)
+        {
+            return (DITriggerConfig)message.GetPayloadByte();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="DI0Trigger"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<DITriggerConfig> GetTimestampedPayload(HarpMessage message)
+        {
+            var payload = message.GetTimestampedPayloadByte();
+            return Timestamped.Create((DITriggerConfig)payload.Value, payload.Seconds);
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="DI0Trigger"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="DI0Trigger"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, DITriggerConfig value)
+        {
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="DI0Trigger"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="DI0Trigger"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, DITriggerConfig value)
+        {
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// DI0Trigger register.
+    /// </summary>
+    /// <seealso cref="DI0Trigger"/>
+    [Description("Filters and selects timestamped messages from the DI0Trigger register.")]
+    public partial class TimestampedDI0Trigger
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="DI0Trigger"/> register. This field is constant.
+        /// </summary>
+        public const int Address = DI0Trigger.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="DI0Trigger"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<DITriggerConfig> GetPayload(HarpMessage message)
+        {
+            return DI0Trigger.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
+    /// Represents a register that configures the callback function triggered when DI1 is triggered.
+    /// </summary>
+    [Description("Configures the callback function triggered when DI1 is triggered")]
+    public partial class DI1Trigger
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="DI1Trigger"/> register. This field is constant.
+        /// </summary>
+        public const int Address = 62;
+
+        /// <summary>
+        /// Represents the payload type of the <see cref="DI1Trigger"/> register. This field is constant.
+        /// </summary>
+        public const PayloadType RegisterType = PayloadType.U8;
+
+        /// <summary>
+        /// Represents the length of the <see cref="DI1Trigger"/> register. This field is constant.
+        /// </summary>
+        public const int RegisterLength = 1;
+
+        /// <summary>
+        /// Returns the payload data for <see cref="DI1Trigger"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the message payload.</returns>
+        public static DITriggerConfig GetPayload(HarpMessage message)
+        {
+            return (DITriggerConfig)message.GetPayloadByte();
+        }
+
+        /// <summary>
+        /// Returns the timestamped payload data for <see cref="DI1Trigger"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<DITriggerConfig> GetTimestampedPayload(HarpMessage message)
+        {
+            var payload = message.GetTimestampedPayloadByte();
+            return Timestamped.Create((DITriggerConfig)payload.Value, payload.Seconds);
+        }
+
+        /// <summary>
+        /// Returns a Harp message for the <see cref="DI1Trigger"/> register.
+        /// </summary>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="DI1Trigger"/> register
+        /// with the specified message type and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(MessageType messageType, DITriggerConfig value)
+        {
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
+        }
+
+        /// <summary>
+        /// Returns a timestamped Harp message for the <see cref="DI1Trigger"/>
+        /// register.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">The type of the Harp message.</param>
+        /// <param name="value">The value to be stored in the message payload.</param>
+        /// <returns>
+        /// A <see cref="HarpMessage"/> object for the <see cref="DI1Trigger"/> register
+        /// with the specified message type, timestamp, and payload.
+        /// </returns>
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, DITriggerConfig value)
+        {
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
+        }
+    }
+
+    /// <summary>
+    /// Provides methods for manipulating timestamped messages from the
+    /// DI1Trigger register.
+    /// </summary>
+    /// <seealso cref="DI1Trigger"/>
+    [Description("Filters and selects timestamped messages from the DI1Trigger register.")]
+    public partial class TimestampedDI1Trigger
+    {
+        /// <summary>
+        /// Represents the address of the <see cref="DI1Trigger"/> register. This field is constant.
+        /// </summary>
+        public const int Address = DI1Trigger.Address;
+
+        /// <summary>
+        /// Returns timestamped payload data for <see cref="DI1Trigger"/> register messages.
+        /// </summary>
+        /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
+        /// <returns>A value representing the timestamped message payload.</returns>
+        public static Timestamped<DITriggerConfig> GetPayload(HarpMessage message)
+        {
+            return DI1Trigger.GetTimestampedPayload(message);
+        }
+    }
+
+    /// <summary>
     /// Represents a register that reserved.
     /// </summary>
     [Description("Reserved")]
@@ -2472,7 +3564,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="Reserved0"/> register. This field is constant.
         /// </summary>
-        public const int Address = 54;
+        public const int Address = 63;
 
         /// <summary>
         /// Represents the payload type of the <see cref="Reserved0"/> register. This field is constant.
@@ -2494,7 +3586,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="Reserved1"/> register. This field is constant.
         /// </summary>
-        public const int Address = 55;
+        public const int Address = 64;
 
         /// <summary>
         /// Represents the payload type of the <see cref="Reserved1"/> register. This field is constant.
@@ -2516,7 +3608,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="Reserved2"/> register. This field is constant.
         /// </summary>
-        public const int Address = 56;
+        public const int Address = 65;
 
         /// <summary>
         /// Represents the payload type of the <see cref="Reserved2"/> register. This field is constant.
@@ -2538,7 +3630,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="Reserved3"/> register. This field is constant.
         /// </summary>
-        public const int Address = 57;
+        public const int Address = 66;
 
         /// <summary>
         /// Represents the payload type of the <see cref="Reserved3"/> register. This field is constant.
@@ -2560,7 +3652,7 @@ namespace Harp.CurrentDriver
         /// <summary>
         /// Represents the address of the <see cref="EnableEvents"/> register. This field is constant.
         /// </summary>
-        public const int Address = 58;
+        public const int Address = 67;
 
         /// <summary>
         /// Represents the payload type of the <see cref="EnableEvents"/> register. This field is constant.
@@ -2657,15 +3749,16 @@ namespace Harp.CurrentDriver
     /// <seealso cref="CreateOutputClearPayload"/>
     /// <seealso cref="CreateOutputTogglePayload"/>
     /// <seealso cref="CreateOutputStatePayload"/>
-    /// <seealso cref="CreateLed0CurrentPayload"/>
-    /// <seealso cref="CreateLed1CurrentPayload"/>
-    /// <seealso cref="CreateDac0VoltagePayload"/>
-    /// <seealso cref="CreateDac1VoltagePayload"/>
     /// <seealso cref="CreateLedEnablePayload"/>
     /// <seealso cref="CreateLedDisablePayload"/>
     /// <seealso cref="CreateLedStatePayload"/>
+    /// <seealso cref="CreateLedTargetStatePayload"/>
+    /// <seealso cref="CreateLed0CurrentPayload"/>
+    /// <seealso cref="CreateLed1CurrentPayload"/>
     /// <seealso cref="CreateLed0MaxCurrentPayload"/>
     /// <seealso cref="CreateLed1MaxCurrentPayload"/>
+    /// <seealso cref="CreateDac0VoltagePayload"/>
+    /// <seealso cref="CreateDac1VoltagePayload"/>
     /// <seealso cref="CreatePulseEnablePayload"/>
     /// <seealso cref="CreatePulseDutyCycleLed0Payload"/>
     /// <seealso cref="CreatePulseDutyCycleLed1Payload"/>
@@ -2674,21 +3767,30 @@ namespace Harp.CurrentDriver
     /// <seealso cref="CreateRampLed0Payload"/>
     /// <seealso cref="CreateRampLed1Payload"/>
     /// <seealso cref="CreateRampConfigPayload"/>
+    /// <seealso cref="CreateProtocol0DurationPayload"/>
+    /// <seealso cref="CreateProtocol1DurationPayload"/>
+    /// <seealso cref="CreateProtocol0DelayPayload"/>
+    /// <seealso cref="CreateProtocol1DelayPayload"/>
+    /// <seealso cref="CreateEnableProtocolPayload"/>
+    /// <seealso cref="CreateDisableProtocolPayload"/>
+    /// <seealso cref="CreateDI0TriggerPayload"/>
+    /// <seealso cref="CreateDI1TriggerPayload"/>
     /// <seealso cref="CreateEnableEventsPayload"/>
     [XmlInclude(typeof(CreateDigitalInputStatePayload))]
     [XmlInclude(typeof(CreateOutputSetPayload))]
     [XmlInclude(typeof(CreateOutputClearPayload))]
     [XmlInclude(typeof(CreateOutputTogglePayload))]
     [XmlInclude(typeof(CreateOutputStatePayload))]
-    [XmlInclude(typeof(CreateLed0CurrentPayload))]
-    [XmlInclude(typeof(CreateLed1CurrentPayload))]
-    [XmlInclude(typeof(CreateDac0VoltagePayload))]
-    [XmlInclude(typeof(CreateDac1VoltagePayload))]
     [XmlInclude(typeof(CreateLedEnablePayload))]
     [XmlInclude(typeof(CreateLedDisablePayload))]
     [XmlInclude(typeof(CreateLedStatePayload))]
+    [XmlInclude(typeof(CreateLedTargetStatePayload))]
+    [XmlInclude(typeof(CreateLed0CurrentPayload))]
+    [XmlInclude(typeof(CreateLed1CurrentPayload))]
     [XmlInclude(typeof(CreateLed0MaxCurrentPayload))]
     [XmlInclude(typeof(CreateLed1MaxCurrentPayload))]
+    [XmlInclude(typeof(CreateDac0VoltagePayload))]
+    [XmlInclude(typeof(CreateDac1VoltagePayload))]
     [XmlInclude(typeof(CreatePulseEnablePayload))]
     [XmlInclude(typeof(CreatePulseDutyCycleLed0Payload))]
     [XmlInclude(typeof(CreatePulseDutyCycleLed1Payload))]
@@ -2697,21 +3799,30 @@ namespace Harp.CurrentDriver
     [XmlInclude(typeof(CreateRampLed0Payload))]
     [XmlInclude(typeof(CreateRampLed1Payload))]
     [XmlInclude(typeof(CreateRampConfigPayload))]
+    [XmlInclude(typeof(CreateProtocol0DurationPayload))]
+    [XmlInclude(typeof(CreateProtocol1DurationPayload))]
+    [XmlInclude(typeof(CreateProtocol0DelayPayload))]
+    [XmlInclude(typeof(CreateProtocol1DelayPayload))]
+    [XmlInclude(typeof(CreateEnableProtocolPayload))]
+    [XmlInclude(typeof(CreateDisableProtocolPayload))]
+    [XmlInclude(typeof(CreateDI0TriggerPayload))]
+    [XmlInclude(typeof(CreateDI1TriggerPayload))]
     [XmlInclude(typeof(CreateEnableEventsPayload))]
     [XmlInclude(typeof(CreateTimestampedDigitalInputStatePayload))]
     [XmlInclude(typeof(CreateTimestampedOutputSetPayload))]
     [XmlInclude(typeof(CreateTimestampedOutputClearPayload))]
     [XmlInclude(typeof(CreateTimestampedOutputTogglePayload))]
     [XmlInclude(typeof(CreateTimestampedOutputStatePayload))]
-    [XmlInclude(typeof(CreateTimestampedLed0CurrentPayload))]
-    [XmlInclude(typeof(CreateTimestampedLed1CurrentPayload))]
-    [XmlInclude(typeof(CreateTimestampedDac0VoltagePayload))]
-    [XmlInclude(typeof(CreateTimestampedDac1VoltagePayload))]
     [XmlInclude(typeof(CreateTimestampedLedEnablePayload))]
     [XmlInclude(typeof(CreateTimestampedLedDisablePayload))]
     [XmlInclude(typeof(CreateTimestampedLedStatePayload))]
+    [XmlInclude(typeof(CreateTimestampedLedTargetStatePayload))]
+    [XmlInclude(typeof(CreateTimestampedLed0CurrentPayload))]
+    [XmlInclude(typeof(CreateTimestampedLed1CurrentPayload))]
     [XmlInclude(typeof(CreateTimestampedLed0MaxCurrentPayload))]
     [XmlInclude(typeof(CreateTimestampedLed1MaxCurrentPayload))]
+    [XmlInclude(typeof(CreateTimestampedDac0VoltagePayload))]
+    [XmlInclude(typeof(CreateTimestampedDac1VoltagePayload))]
     [XmlInclude(typeof(CreateTimestampedPulseEnablePayload))]
     [XmlInclude(typeof(CreateTimestampedPulseDutyCycleLed0Payload))]
     [XmlInclude(typeof(CreateTimestampedPulseDutyCycleLed1Payload))]
@@ -2720,6 +3831,14 @@ namespace Harp.CurrentDriver
     [XmlInclude(typeof(CreateTimestampedRampLed0Payload))]
     [XmlInclude(typeof(CreateTimestampedRampLed1Payload))]
     [XmlInclude(typeof(CreateTimestampedRampConfigPayload))]
+    [XmlInclude(typeof(CreateTimestampedProtocol0DurationPayload))]
+    [XmlInclude(typeof(CreateTimestampedProtocol1DurationPayload))]
+    [XmlInclude(typeof(CreateTimestampedProtocol0DelayPayload))]
+    [XmlInclude(typeof(CreateTimestampedProtocol1DelayPayload))]
+    [XmlInclude(typeof(CreateTimestampedEnableProtocolPayload))]
+    [XmlInclude(typeof(CreateTimestampedDisableProtocolPayload))]
+    [XmlInclude(typeof(CreateTimestampedDI0TriggerPayload))]
+    [XmlInclude(typeof(CreateTimestampedDI1TriggerPayload))]
     [XmlInclude(typeof(CreateTimestampedEnableEventsPayload))]
     [Description("Creates standard message payloads for the CurrentDriver device.")]
     public partial class CreateMessage : CreateMessageBuilder, INamedElement
@@ -3007,6 +4126,222 @@ namespace Harp.CurrentDriver
 
     /// <summary>
     /// Represents an operator that creates a message payload
+    /// that enable driver on the selected output.
+    /// </summary>
+    [DisplayName("LedEnablePayload")]
+    [Description("Creates a message payload that enable driver on the selected output.")]
+    public partial class CreateLedEnablePayload
+    {
+        /// <summary>
+        /// Gets or sets the value that enable driver on the selected output.
+        /// </summary>
+        [Description("The value that enable driver on the selected output.")]
+        public LedOutputs LedEnable { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the LedEnable register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public LedOutputs GetPayload()
+        {
+            return LedEnable;
+        }
+
+        /// <summary>
+        /// Creates a message that enable driver on the selected output.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the LedEnable register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedEnable.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that enable driver on the selected output.
+    /// </summary>
+    [DisplayName("TimestampedLedEnablePayload")]
+    [Description("Creates a timestamped message payload that enable driver on the selected output.")]
+    public partial class CreateTimestampedLedEnablePayload : CreateLedEnablePayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that enable driver on the selected output.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the LedEnable register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedEnable.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that disable driver on the selected output.
+    /// </summary>
+    [DisplayName("LedDisablePayload")]
+    [Description("Creates a message payload that disable driver on the selected output.")]
+    public partial class CreateLedDisablePayload
+    {
+        /// <summary>
+        /// Gets or sets the value that disable driver on the selected output.
+        /// </summary>
+        [Description("The value that disable driver on the selected output.")]
+        public LedOutputs LedDisable { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the LedDisable register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public LedOutputs GetPayload()
+        {
+            return LedDisable;
+        }
+
+        /// <summary>
+        /// Creates a message that disable driver on the selected output.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the LedDisable register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedDisable.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that disable driver on the selected output.
+    /// </summary>
+    [DisplayName("TimestampedLedDisablePayload")]
+    [Description("Creates a timestamped message payload that disable driver on the selected output.")]
+    public partial class CreateTimestampedLedDisablePayload : CreateLedDisablePayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that disable driver on the selected output.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the LedDisable register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedDisable.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that control the respective LED output.
+    /// </summary>
+    [DisplayName("LedStatePayload")]
+    [Description("Creates a message payload that control the respective LED output.")]
+    public partial class CreateLedStatePayload
+    {
+        /// <summary>
+        /// Gets or sets the value that control the respective LED output.
+        /// </summary>
+        [Description("The value that control the respective LED output.")]
+        public LedOutputs LedState { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the LedState register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public LedOutputs GetPayload()
+        {
+            return LedState;
+        }
+
+        /// <summary>
+        /// Creates a message that control the respective LED output.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the LedState register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedState.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that control the respective LED output.
+    /// </summary>
+    [DisplayName("TimestampedLedStatePayload")]
+    [Description("Creates a timestamped message payload that control the respective LED output.")]
+    public partial class CreateTimestampedLedStatePayload : CreateLedStatePayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that control the respective LED output.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the LedState register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedState.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that sends an event when the LED reaches the target value.
+    /// </summary>
+    [DisplayName("LedTargetStatePayload")]
+    [Description("Creates a message payload that sends an event when the LED reaches the target value.")]
+    public partial class CreateLedTargetStatePayload
+    {
+        /// <summary>
+        /// Gets or sets the value that sends an event when the LED reaches the target value.
+        /// </summary>
+        [Description("The value that sends an event when the LED reaches the target value.")]
+        public LedOutputs LedTargetState { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the LedTargetState register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public LedOutputs GetPayload()
+        {
+            return LedTargetState;
+        }
+
+        /// <summary>
+        /// Creates a message that sends an event when the LED reaches the target value.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the LedTargetState register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedTargetState.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that sends an event when the LED reaches the target value.
+    /// </summary>
+    [DisplayName("TimestampedLedTargetStatePayload")]
+    [Description("Creates a timestamped message payload that sends an event when the LED reaches the target value.")]
+    public partial class CreateTimestampedLedTargetStatePayload : CreateLedTargetStatePayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that sends an event when the LED reaches the target value.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the LedTargetState register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.LedTargetState.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
     /// that configuration of current to drive LED 0 [0:1000] mA.
     /// </summary>
     [DisplayName("Led0CurrentPayload")]
@@ -3119,280 +4454,6 @@ namespace Harp.CurrentDriver
 
     /// <summary>
     /// Represents an operator that creates a message payload
-    /// that configuration of DAC 0 voltage [0:5000] mV.
-    /// </summary>
-    [DisplayName("Dac0VoltagePayload")]
-    [Description("Creates a message payload that configuration of DAC 0 voltage [0:5000] mV.")]
-    public partial class CreateDac0VoltagePayload
-    {
-        /// <summary>
-        /// Gets or sets the value that configuration of DAC 0 voltage [0:5000] mV.
-        /// </summary>
-        [Range(min: 0, max: 5000)]
-        [Editor(DesignTypes.NumericUpDownEditor, DesignTypes.UITypeEditor)]
-        [Description("The value that configuration of DAC 0 voltage [0:5000] mV.")]
-        public float Dac0Voltage { get; set; } = 0F;
-
-        /// <summary>
-        /// Creates a message payload for the Dac0Voltage register.
-        /// </summary>
-        /// <returns>The created message payload value.</returns>
-        public float GetPayload()
-        {
-            return Dac0Voltage;
-        }
-
-        /// <summary>
-        /// Creates a message that configuration of DAC 0 voltage [0:5000] mV.
-        /// </summary>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new message for the Dac0Voltage register.</returns>
-        public HarpMessage GetMessage(MessageType messageType)
-        {
-            return Harp.CurrentDriver.Dac0Voltage.FromPayload(messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a timestamped message payload
-    /// that configuration of DAC 0 voltage [0:5000] mV.
-    /// </summary>
-    [DisplayName("TimestampedDac0VoltagePayload")]
-    [Description("Creates a timestamped message payload that configuration of DAC 0 voltage [0:5000] mV.")]
-    public partial class CreateTimestampedDac0VoltagePayload : CreateDac0VoltagePayload
-    {
-        /// <summary>
-        /// Creates a timestamped message that configuration of DAC 0 voltage [0:5000] mV.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new timestamped message for the Dac0Voltage register.</returns>
-        public HarpMessage GetMessage(double timestamp, MessageType messageType)
-        {
-            return Harp.CurrentDriver.Dac0Voltage.FromPayload(timestamp, messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a message payload
-    /// that configuration of DAC 1 voltage [0:5000] mV.
-    /// </summary>
-    [DisplayName("Dac1VoltagePayload")]
-    [Description("Creates a message payload that configuration of DAC 1 voltage [0:5000] mV.")]
-    public partial class CreateDac1VoltagePayload
-    {
-        /// <summary>
-        /// Gets or sets the value that configuration of DAC 1 voltage [0:5000] mV.
-        /// </summary>
-        [Range(min: 0, max: 5000)]
-        [Editor(DesignTypes.NumericUpDownEditor, DesignTypes.UITypeEditor)]
-        [Description("The value that configuration of DAC 1 voltage [0:5000] mV.")]
-        public float Dac1Voltage { get; set; } = 0F;
-
-        /// <summary>
-        /// Creates a message payload for the Dac1Voltage register.
-        /// </summary>
-        /// <returns>The created message payload value.</returns>
-        public float GetPayload()
-        {
-            return Dac1Voltage;
-        }
-
-        /// <summary>
-        /// Creates a message that configuration of DAC 1 voltage [0:5000] mV.
-        /// </summary>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new message for the Dac1Voltage register.</returns>
-        public HarpMessage GetMessage(MessageType messageType)
-        {
-            return Harp.CurrentDriver.Dac1Voltage.FromPayload(messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a timestamped message payload
-    /// that configuration of DAC 1 voltage [0:5000] mV.
-    /// </summary>
-    [DisplayName("TimestampedDac1VoltagePayload")]
-    [Description("Creates a timestamped message payload that configuration of DAC 1 voltage [0:5000] mV.")]
-    public partial class CreateTimestampedDac1VoltagePayload : CreateDac1VoltagePayload
-    {
-        /// <summary>
-        /// Creates a timestamped message that configuration of DAC 1 voltage [0:5000] mV.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new timestamped message for the Dac1Voltage register.</returns>
-        public HarpMessage GetMessage(double timestamp, MessageType messageType)
-        {
-            return Harp.CurrentDriver.Dac1Voltage.FromPayload(timestamp, messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a message payload
-    /// that enable driver on the selected output.
-    /// </summary>
-    [DisplayName("LedEnablePayload")]
-    [Description("Creates a message payload that enable driver on the selected output.")]
-    public partial class CreateLedEnablePayload
-    {
-        /// <summary>
-        /// Gets or sets the value that enable driver on the selected output.
-        /// </summary>
-        [Description("The value that enable driver on the selected output.")]
-        public LedOutputs LedEnable { get; set; }
-
-        /// <summary>
-        /// Creates a message payload for the LedEnable register.
-        /// </summary>
-        /// <returns>The created message payload value.</returns>
-        public LedOutputs GetPayload()
-        {
-            return LedEnable;
-        }
-
-        /// <summary>
-        /// Creates a message that enable driver on the selected output.
-        /// </summary>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new message for the LedEnable register.</returns>
-        public HarpMessage GetMessage(MessageType messageType)
-        {
-            return Harp.CurrentDriver.LedEnable.FromPayload(messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a timestamped message payload
-    /// that enable driver on the selected output.
-    /// </summary>
-    [DisplayName("TimestampedLedEnablePayload")]
-    [Description("Creates a timestamped message payload that enable driver on the selected output.")]
-    public partial class CreateTimestampedLedEnablePayload : CreateLedEnablePayload
-    {
-        /// <summary>
-        /// Creates a timestamped message that enable driver on the selected output.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new timestamped message for the LedEnable register.</returns>
-        public HarpMessage GetMessage(double timestamp, MessageType messageType)
-        {
-            return Harp.CurrentDriver.LedEnable.FromPayload(timestamp, messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a message payload
-    /// that disable driver on the selected output.
-    /// </summary>
-    [DisplayName("LedDisablePayload")]
-    [Description("Creates a message payload that disable driver on the selected output.")]
-    public partial class CreateLedDisablePayload
-    {
-        /// <summary>
-        /// Gets or sets the value that disable driver on the selected output.
-        /// </summary>
-        [Description("The value that disable driver on the selected output.")]
-        public LedOutputs LedDisable { get; set; }
-
-        /// <summary>
-        /// Creates a message payload for the LedDisable register.
-        /// </summary>
-        /// <returns>The created message payload value.</returns>
-        public LedOutputs GetPayload()
-        {
-            return LedDisable;
-        }
-
-        /// <summary>
-        /// Creates a message that disable driver on the selected output.
-        /// </summary>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new message for the LedDisable register.</returns>
-        public HarpMessage GetMessage(MessageType messageType)
-        {
-            return Harp.CurrentDriver.LedDisable.FromPayload(messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a timestamped message payload
-    /// that disable driver on the selected output.
-    /// </summary>
-    [DisplayName("TimestampedLedDisablePayload")]
-    [Description("Creates a timestamped message payload that disable driver on the selected output.")]
-    public partial class CreateTimestampedLedDisablePayload : CreateLedDisablePayload
-    {
-        /// <summary>
-        /// Creates a timestamped message that disable driver on the selected output.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new timestamped message for the LedDisable register.</returns>
-        public HarpMessage GetMessage(double timestamp, MessageType messageType)
-        {
-            return Harp.CurrentDriver.LedDisable.FromPayload(timestamp, messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a message payload
-    /// that control the correspondent LED output.
-    /// </summary>
-    [DisplayName("LedStatePayload")]
-    [Description("Creates a message payload that control the correspondent LED output.")]
-    public partial class CreateLedStatePayload
-    {
-        /// <summary>
-        /// Gets or sets the value that control the correspondent LED output.
-        /// </summary>
-        [Description("The value that control the correspondent LED output.")]
-        public LedOutputs LedState { get; set; }
-
-        /// <summary>
-        /// Creates a message payload for the LedState register.
-        /// </summary>
-        /// <returns>The created message payload value.</returns>
-        public LedOutputs GetPayload()
-        {
-            return LedState;
-        }
-
-        /// <summary>
-        /// Creates a message that control the correspondent LED output.
-        /// </summary>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new message for the LedState register.</returns>
-        public HarpMessage GetMessage(MessageType messageType)
-        {
-            return Harp.CurrentDriver.LedState.FromPayload(messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a timestamped message payload
-    /// that control the correspondent LED output.
-    /// </summary>
-    [DisplayName("TimestampedLedStatePayload")]
-    [Description("Creates a timestamped message payload that control the correspondent LED output.")]
-    public partial class CreateTimestampedLedStatePayload : CreateLedStatePayload
-    {
-        /// <summary>
-        /// Creates a timestamped message that control the correspondent LED output.
-        /// </summary>
-        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
-        /// <param name="messageType">Specifies the type of the created message.</param>
-        /// <returns>A new timestamped message for the LedState register.</returns>
-        public HarpMessage GetMessage(double timestamp, MessageType messageType)
-        {
-            return Harp.CurrentDriver.LedState.FromPayload(timestamp, messageType, GetPayload());
-        }
-    }
-
-    /// <summary>
-    /// Represents an operator that creates a message payload
     /// that configuration of current to drive LED 0 [0:1000] mA.
     /// </summary>
     [DisplayName("Led0MaxCurrentPayload")]
@@ -3500,6 +4561,118 @@ namespace Harp.CurrentDriver
         public HarpMessage GetMessage(double timestamp, MessageType messageType)
         {
             return Harp.CurrentDriver.Led1MaxCurrent.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that configuration of DAC 0 voltage [0:5000] mV.
+    /// </summary>
+    [DisplayName("Dac0VoltagePayload")]
+    [Description("Creates a message payload that configuration of DAC 0 voltage [0:5000] mV.")]
+    public partial class CreateDac0VoltagePayload
+    {
+        /// <summary>
+        /// Gets or sets the value that configuration of DAC 0 voltage [0:5000] mV.
+        /// </summary>
+        [Range(min: 0, max: 5000)]
+        [Editor(DesignTypes.NumericUpDownEditor, DesignTypes.UITypeEditor)]
+        [Description("The value that configuration of DAC 0 voltage [0:5000] mV.")]
+        public float Dac0Voltage { get; set; } = 0F;
+
+        /// <summary>
+        /// Creates a message payload for the Dac0Voltage register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public float GetPayload()
+        {
+            return Dac0Voltage;
+        }
+
+        /// <summary>
+        /// Creates a message that configuration of DAC 0 voltage [0:5000] mV.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the Dac0Voltage register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.Dac0Voltage.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that configuration of DAC 0 voltage [0:5000] mV.
+    /// </summary>
+    [DisplayName("TimestampedDac0VoltagePayload")]
+    [Description("Creates a timestamped message payload that configuration of DAC 0 voltage [0:5000] mV.")]
+    public partial class CreateTimestampedDac0VoltagePayload : CreateDac0VoltagePayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that configuration of DAC 0 voltage [0:5000] mV.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the Dac0Voltage register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.Dac0Voltage.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that configuration of DAC 1 voltage [0:5000] mV.
+    /// </summary>
+    [DisplayName("Dac1VoltagePayload")]
+    [Description("Creates a message payload that configuration of DAC 1 voltage [0:5000] mV.")]
+    public partial class CreateDac1VoltagePayload
+    {
+        /// <summary>
+        /// Gets or sets the value that configuration of DAC 1 voltage [0:5000] mV.
+        /// </summary>
+        [Range(min: 0, max: 5000)]
+        [Editor(DesignTypes.NumericUpDownEditor, DesignTypes.UITypeEditor)]
+        [Description("The value that configuration of DAC 1 voltage [0:5000] mV.")]
+        public float Dac1Voltage { get; set; } = 0F;
+
+        /// <summary>
+        /// Creates a message payload for the Dac1Voltage register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public float GetPayload()
+        {
+            return Dac1Voltage;
+        }
+
+        /// <summary>
+        /// Creates a message that configuration of DAC 1 voltage [0:5000] mV.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the Dac1Voltage register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.Dac1Voltage.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that configuration of DAC 1 voltage [0:5000] mV.
+    /// </summary>
+    [DisplayName("TimestampedDac1VoltagePayload")]
+    [Description("Creates a timestamped message payload that configuration of DAC 1 voltage [0:5000] mV.")]
+    public partial class CreateTimestampedDac1VoltagePayload : CreateDac1VoltagePayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that configuration of DAC 1 voltage [0:5000] mV.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the Dac1Voltage register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.Dac1Voltage.FromPayload(timestamp, messageType, GetPayload());
         }
     }
 
@@ -3949,6 +5122,438 @@ namespace Harp.CurrentDriver
 
     /// <summary>
     /// Represents an operator that creates a message payload
+    /// that specifies the duration of LED0 protocol.
+    /// </summary>
+    [DisplayName("Protocol0DurationPayload")]
+    [Description("Creates a message payload that specifies the duration of LED0 protocol.")]
+    public partial class CreateProtocol0DurationPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that specifies the duration of LED0 protocol.
+        /// </summary>
+        [Description("The value that specifies the duration of LED0 protocol.")]
+        public ushort Protocol0Duration { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the Protocol0Duration register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public ushort GetPayload()
+        {
+            return Protocol0Duration;
+        }
+
+        /// <summary>
+        /// Creates a message that specifies the duration of LED0 protocol.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the Protocol0Duration register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol0Duration.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that specifies the duration of LED0 protocol.
+    /// </summary>
+    [DisplayName("TimestampedProtocol0DurationPayload")]
+    [Description("Creates a timestamped message payload that specifies the duration of LED0 protocol.")]
+    public partial class CreateTimestampedProtocol0DurationPayload : CreateProtocol0DurationPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that specifies the duration of LED0 protocol.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the Protocol0Duration register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol0Duration.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that specifies the duration of LED1 protocol.
+    /// </summary>
+    [DisplayName("Protocol1DurationPayload")]
+    [Description("Creates a message payload that specifies the duration of LED1 protocol.")]
+    public partial class CreateProtocol1DurationPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that specifies the duration of LED1 protocol.
+        /// </summary>
+        [Description("The value that specifies the duration of LED1 protocol.")]
+        public ushort Protocol1Duration { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the Protocol1Duration register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public ushort GetPayload()
+        {
+            return Protocol1Duration;
+        }
+
+        /// <summary>
+        /// Creates a message that specifies the duration of LED1 protocol.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the Protocol1Duration register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol1Duration.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that specifies the duration of LED1 protocol.
+    /// </summary>
+    [DisplayName("TimestampedProtocol1DurationPayload")]
+    [Description("Creates a timestamped message payload that specifies the duration of LED1 protocol.")]
+    public partial class CreateTimestampedProtocol1DurationPayload : CreateProtocol1DurationPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that specifies the duration of LED1 protocol.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the Protocol1Duration register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol1Duration.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that specifies the delay of the LED0 protocol.
+    /// </summary>
+    [DisplayName("Protocol0DelayPayload")]
+    [Description("Creates a message payload that specifies the delay of the LED0 protocol.")]
+    public partial class CreateProtocol0DelayPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that specifies the delay of the LED0 protocol.
+        /// </summary>
+        [Description("The value that specifies the delay of the LED0 protocol.")]
+        public ushort Protocol0Delay { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the Protocol0Delay register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public ushort GetPayload()
+        {
+            return Protocol0Delay;
+        }
+
+        /// <summary>
+        /// Creates a message that specifies the delay of the LED0 protocol.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the Protocol0Delay register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol0Delay.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that specifies the delay of the LED0 protocol.
+    /// </summary>
+    [DisplayName("TimestampedProtocol0DelayPayload")]
+    [Description("Creates a timestamped message payload that specifies the delay of the LED0 protocol.")]
+    public partial class CreateTimestampedProtocol0DelayPayload : CreateProtocol0DelayPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that specifies the delay of the LED0 protocol.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the Protocol0Delay register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol0Delay.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that specifies the delay of the LED1 protocol.
+    /// </summary>
+    [DisplayName("Protocol1DelayPayload")]
+    [Description("Creates a message payload that specifies the delay of the LED1 protocol.")]
+    public partial class CreateProtocol1DelayPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that specifies the delay of the LED1 protocol.
+        /// </summary>
+        [Description("The value that specifies the delay of the LED1 protocol.")]
+        public ushort Protocol1Delay { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the Protocol1Delay register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public ushort GetPayload()
+        {
+            return Protocol1Delay;
+        }
+
+        /// <summary>
+        /// Creates a message that specifies the delay of the LED1 protocol.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the Protocol1Delay register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol1Delay.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that specifies the delay of the LED1 protocol.
+    /// </summary>
+    [DisplayName("TimestampedProtocol1DelayPayload")]
+    [Description("Creates a timestamped message payload that specifies the delay of the LED1 protocol.")]
+    public partial class CreateTimestampedProtocol1DelayPayload : CreateProtocol1DelayPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that specifies the delay of the LED1 protocol.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the Protocol1Delay register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.Protocol1Delay.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that enable the respective protocol.
+    /// </summary>
+    [DisplayName("EnableProtocolPayload")]
+    [Description("Creates a message payload that enable the respective protocol.")]
+    public partial class CreateEnableProtocolPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that enable the respective protocol.
+        /// </summary>
+        [Description("The value that enable the respective protocol.")]
+        public LedOutputs EnableProtocol { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the EnableProtocol register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public LedOutputs GetPayload()
+        {
+            return EnableProtocol;
+        }
+
+        /// <summary>
+        /// Creates a message that enable the respective protocol.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the EnableProtocol register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.EnableProtocol.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that enable the respective protocol.
+    /// </summary>
+    [DisplayName("TimestampedEnableProtocolPayload")]
+    [Description("Creates a timestamped message payload that enable the respective protocol.")]
+    public partial class CreateTimestampedEnableProtocolPayload : CreateEnableProtocolPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that enable the respective protocol.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the EnableProtocol register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.EnableProtocol.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that disable the respective protocol.
+    /// </summary>
+    [DisplayName("DisableProtocolPayload")]
+    [Description("Creates a message payload that disable the respective protocol.")]
+    public partial class CreateDisableProtocolPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that disable the respective protocol.
+        /// </summary>
+        [Description("The value that disable the respective protocol.")]
+        public LedOutputs DisableProtocol { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the DisableProtocol register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public LedOutputs GetPayload()
+        {
+            return DisableProtocol;
+        }
+
+        /// <summary>
+        /// Creates a message that disable the respective protocol.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the DisableProtocol register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.DisableProtocol.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that disable the respective protocol.
+    /// </summary>
+    [DisplayName("TimestampedDisableProtocolPayload")]
+    [Description("Creates a timestamped message payload that disable the respective protocol.")]
+    public partial class CreateTimestampedDisableProtocolPayload : CreateDisableProtocolPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that disable the respective protocol.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the DisableProtocol register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.DisableProtocol.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that configures the callback function triggered when DI0 is triggered.
+    /// </summary>
+    [DisplayName("DI0TriggerPayload")]
+    [Description("Creates a message payload that configures the callback function triggered when DI0 is triggered.")]
+    public partial class CreateDI0TriggerPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that configures the callback function triggered when DI0 is triggered.
+        /// </summary>
+        [Description("The value that configures the callback function triggered when DI0 is triggered.")]
+        public DITriggerConfig DI0Trigger { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the DI0Trigger register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public DITriggerConfig GetPayload()
+        {
+            return DI0Trigger;
+        }
+
+        /// <summary>
+        /// Creates a message that configures the callback function triggered when DI0 is triggered.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the DI0Trigger register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.DI0Trigger.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that configures the callback function triggered when DI0 is triggered.
+    /// </summary>
+    [DisplayName("TimestampedDI0TriggerPayload")]
+    [Description("Creates a timestamped message payload that configures the callback function triggered when DI0 is triggered.")]
+    public partial class CreateTimestampedDI0TriggerPayload : CreateDI0TriggerPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that configures the callback function triggered when DI0 is triggered.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the DI0Trigger register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.DI0Trigger.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
+    /// that configures the callback function triggered when DI1 is triggered.
+    /// </summary>
+    [DisplayName("DI1TriggerPayload")]
+    [Description("Creates a message payload that configures the callback function triggered when DI1 is triggered.")]
+    public partial class CreateDI1TriggerPayload
+    {
+        /// <summary>
+        /// Gets or sets the value that configures the callback function triggered when DI1 is triggered.
+        /// </summary>
+        [Description("The value that configures the callback function triggered when DI1 is triggered.")]
+        public DITriggerConfig DI1Trigger { get; set; }
+
+        /// <summary>
+        /// Creates a message payload for the DI1Trigger register.
+        /// </summary>
+        /// <returns>The created message payload value.</returns>
+        public DITriggerConfig GetPayload()
+        {
+            return DI1Trigger;
+        }
+
+        /// <summary>
+        /// Creates a message that configures the callback function triggered when DI1 is triggered.
+        /// </summary>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new message for the DI1Trigger register.</returns>
+        public HarpMessage GetMessage(MessageType messageType)
+        {
+            return Harp.CurrentDriver.DI1Trigger.FromPayload(messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a timestamped message payload
+    /// that configures the callback function triggered when DI1 is triggered.
+    /// </summary>
+    [DisplayName("TimestampedDI1TriggerPayload")]
+    [Description("Creates a timestamped message payload that configures the callback function triggered when DI1 is triggered.")]
+    public partial class CreateTimestampedDI1TriggerPayload : CreateDI1TriggerPayload
+    {
+        /// <summary>
+        /// Creates a timestamped message that configures the callback function triggered when DI1 is triggered.
+        /// </summary>
+        /// <param name="timestamp">The timestamp of the message payload, in seconds.</param>
+        /// <param name="messageType">Specifies the type of the created message.</param>
+        /// <returns>A new timestamped message for the DI1Trigger register.</returns>
+        public HarpMessage GetMessage(double timestamp, MessageType messageType)
+        {
+            return Harp.CurrentDriver.DI1Trigger.FromPayload(timestamp, messageType, GetPayload());
+        }
+    }
+
+    /// <summary>
+    /// Represents an operator that creates a message payload
     /// that specifies the active events in the device.
     /// </summary>
     [DisplayName("EnableEventsPayload")]
@@ -4030,8 +5635,8 @@ namespace Harp.CurrentDriver
     public enum LedOutputs : byte
     {
         None = 0x0,
-        LED0 = 0x1,
-        LED1 = 0x2
+        Led0 = 0x1,
+        Led1 = 0x2
     }
 
     /// <summary>
@@ -4041,19 +5646,136 @@ namespace Harp.CurrentDriver
     public enum LedRamps : byte
     {
         None = 0x0,
-        LED0_UP = 0x1,
-        LED0_DOWN = 0x2,
-        LED1_UP = 0x4,
-        LED1_DOWN = 0x8
+        Led0Rise = 0x1,
+        Led0Fall = 0x2,
+        Led1Rise = 0x4,
+        Led1Fall = 0x8
     }
 
     /// <summary>
-    /// Specifies the active events in the device.
+    /// Specifies the active events in the device
     /// </summary>
     [Flags]
     public enum CurrentDriverEvents : byte
     {
         None = 0x0,
-        DIs = 0x1
+        DIs = 0x1,
+        LedState = 0x2
+    }
+
+    /// <summary>
+    /// Specifies the way digital inputs work
+    /// </summary>
+    public enum DITriggerConfig : byte
+    {
+        Digital = 0,
+        ControlLed = 1,
+        StartProtocol = 2,
+        StartAndStopProtocol = 3
+    }
+
+    internal static partial class PayloadMarshal
+    {
+        internal static T[] GetSubArray<T>(T[] array, int offset, int count)
+        {
+            var result = new T[count];
+            Array.Copy(array, offset, result, 0, count);
+            return result;
+        }
+
+        internal static byte ReadByte(ArraySegment<byte> segment) => segment.Array[segment.Offset];
+
+        internal static sbyte ReadSByte(ArraySegment<byte> segment) => (sbyte)segment.Array[segment.Offset];
+
+        internal static ushort ReadUInt16(ArraySegment<byte> segment) => BitConverter.ToUInt16(segment.Array, segment.Offset);
+
+        internal static short ReadInt16(ArraySegment<byte> segment) => BitConverter.ToInt16(segment.Array, segment.Offset);
+
+        internal static uint ReadUInt32(ArraySegment<byte> segment) => BitConverter.ToUInt32(segment.Array, segment.Offset);
+
+        internal static int ReadInt32(ArraySegment<byte> segment) => BitConverter.ToInt32(segment.Array, segment.Offset);
+
+        internal static ulong ReadUInt64(ArraySegment<byte> segment) => BitConverter.ToUInt64(segment.Array, segment.Offset);
+
+        internal static long ReadInt64(ArraySegment<byte> segment) => BitConverter.ToInt64(segment.Array, segment.Offset);
+
+        internal static float ReadSingle(ArraySegment<byte> segment) => BitConverter.ToSingle(segment.Array, segment.Offset);
+
+        internal static string ReadUtf8String(ArraySegment<byte> segment)
+        {
+            var count = Array.IndexOf(segment.Array, (byte)0, segment.Offset, segment.Count) - segment.Offset;
+            return System.Text.Encoding.UTF8.GetString(segment.Array, segment.Offset, count < 0 ? segment.Count : count);
+        }
+
+        internal static void Write(ArraySegment<byte> segment, byte value) => segment.Array[segment.Offset] = value;
+
+        internal static void Write(ArraySegment<byte> segment, sbyte value) => segment.Array[segment.Offset] = (byte)value;
+
+        internal static void Write(ArraySegment<byte> segment, ushort value)
+        {
+            segment.Array[segment.Offset] = (byte)value;
+            segment.Array[segment.Offset + 1] = (byte)(value >> 8);
+        }
+
+        internal static void Write(ArraySegment<byte> segment, short value)
+        {
+            segment.Array[segment.Offset] = (byte)value;
+            segment.Array[segment.Offset + 1] = (byte)(value >> 8);
+        }
+
+        internal static void Write(ArraySegment<byte> segment, uint value)
+        {
+            segment.Array[segment.Offset] = (byte)value;
+            segment.Array[segment.Offset + 1] = (byte)(value >> 8);
+            segment.Array[segment.Offset + 2] = (byte)(value >> 16);
+            segment.Array[segment.Offset + 3] = (byte)(value >> 24);
+        }
+
+        internal static void Write(ArraySegment<byte> segment, int value)
+        {
+            segment.Array[segment.Offset] = (byte)value;
+            segment.Array[segment.Offset + 1] = (byte)(value >> 8);
+            segment.Array[segment.Offset + 2] = (byte)(value >> 16);
+            segment.Array[segment.Offset + 3] = (byte)(value >> 24);
+        }
+
+        internal static void Write(ArraySegment<byte> segment, ulong value)
+        {
+            segment.Array[segment.Offset] = (byte)value;
+            segment.Array[segment.Offset + 1] = (byte)(value >> 8);
+            segment.Array[segment.Offset + 2] = (byte)(value >> 16);
+            segment.Array[segment.Offset + 3] = (byte)(value >> 24);
+            segment.Array[segment.Offset + 4] = (byte)(value >> 32);
+            segment.Array[segment.Offset + 5] = (byte)(value >> 40);
+            segment.Array[segment.Offset + 6] = (byte)(value >> 48);
+            segment.Array[segment.Offset + 7] = (byte)(value >> 56);
+        }
+
+        internal static void Write(ArraySegment<byte> segment, long value)
+        {
+            segment.Array[segment.Offset] = (byte)value;
+            segment.Array[segment.Offset + 1] = (byte)(value >> 8);
+            segment.Array[segment.Offset + 2] = (byte)(value >> 16);
+            segment.Array[segment.Offset + 3] = (byte)(value >> 24);
+            segment.Array[segment.Offset + 4] = (byte)(value >> 32);
+            segment.Array[segment.Offset + 5] = (byte)(value >> 40);
+            segment.Array[segment.Offset + 6] = (byte)(value >> 48);
+            segment.Array[segment.Offset + 7] = (byte)(value >> 56);
+        }
+
+        internal static unsafe void Write(ArraySegment<byte> segment, float value) => Write(segment, *(int*)&value);
+
+        internal static unsafe void Write(ArraySegment<byte> segment, string value) =>
+            System.Text.Encoding.UTF8.GetBytes(value, 0, Math.Min(value.Length, segment.Count), segment.Array, segment.Offset);
+
+        internal static void Write<T>(ArraySegment<byte> segment, T[] values) where T : unmanaged
+        {
+            Buffer.BlockCopy(values, 0, segment.Array, segment.Offset, segment.Count);
+        }
+
+        internal static void Write<T>(ArraySegment<T> segment, T[] values)
+        {
+            Array.Copy(values, 0, segment.Array, segment.Offset, segment.Count);
+        }
     }
 }

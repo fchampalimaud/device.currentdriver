@@ -208,13 +208,13 @@ bitMasks:
       Led1Rise: 0x4
       Led1Fall: 0x8
   CurrentDriverEvents:
-    description: Specifies the active events in the device.
+    description: Specifies the active events in the device
     bits:
       DIs: 0x1
       LedState: 0x2
-  groupMasks:
-    DITriggerConfig:
-    description:
+groupMasks:
+  DITriggerConfig:
+    description: Specifies the way digital inputs work
     values:
       Digital: 0
       ControlLed: 1
