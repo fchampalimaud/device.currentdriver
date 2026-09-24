@@ -20,8 +20,8 @@ void init_ios(void)
 	io_set_int(&PORTH, INT_LEVEL_LOW, 0, (1<<0), false);                 // DI1
 
 	/* Configure output pins */
-	io_pin2out(&PORTB, 5, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // I_OFF_DAC0
-	io_pin2out(&PORTB, 6, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // I_OFF_DAC1
+	io_pin2out(&PORTH, 2, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // I_OFF_DAC0
+	io_pin2out(&PORTH, 5, OUT_IO_DIGITAL, IN_EN_IO_EN);                  // I_OFF_DAC1
 	io_pin2out(&PORTD, 3, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CE1
 	io_pin2out(&PORTD, 4, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CE2
 	io_pin2out(&PORTF, 5, OUT_IO_DIGITAL, IN_EN_IO_DIS);                 // CS0

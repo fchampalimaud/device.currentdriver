@@ -34,16 +34,16 @@ void init_ios(void);
 
 
 /* I_OFF_DAC0 */
-#define set_I_OFF_DAC0 set_io(PORTB, 5)
-#define clr_I_OFF_DAC0 clear_io(PORTB, 5)
-#define tgl_I_OFF_DAC0 toggle_io(PORTB, 5)
-#define read_I_OFF_DAC0 read_io(PORTB, 5)
+#define set_I_OFF_DAC0 set_io(PORTH, 2)
+#define clr_I_OFF_DAC0 clear_io(PORTH, 2)
+#define tgl_I_OFF_DAC0 toggle_io(PORTH, 2)
+#define read_I_OFF_DAC0 read_io(PORTH, 2)
 
 /* I_OFF_DAC1 */
-#define set_I_OFF_DAC1 set_io(PORTB, 6)
-#define clr_I_OFF_DAC1 clear_io(PORTB, 6)
-#define tgl_I_OFF_DAC1 toggle_io(PORTB, 6)
-#define read_I_OFF_DAC1 read_io(PORTB, 6)
+#define set_I_OFF_DAC1 set_io(PORTH, 5)
+#define clr_I_OFF_DAC1 clear_io(PORTH, 5)
+#define tgl_I_OFF_DAC1 toggle_io(PORTH, 5)
+#define read_I_OFF_DAC1 read_io(PORTH, 5)
 
 /* CE1 */
 #define set_CE1 set_io(PORTD, 3)
