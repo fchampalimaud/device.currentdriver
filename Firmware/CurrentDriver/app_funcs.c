@@ -218,7 +218,7 @@ bool app_write_REG_LED0_CURRENT(void *a)
 {
 	float reg = *((float*)a);
 	
-	if (reg < 0 || (reg > 1000 && reg > app_regs.REG_LED0_MAX_CURRENT))
+	if (reg < 0 || (reg > 500 && reg > app_regs.REG_LED0_MAX_CURRENT))
 	{
 		return false;
 	}
@@ -240,7 +240,7 @@ bool app_write_REG_LED1_CURRENT(void *a)
 {
 	float reg = *((float*)a);
 
-	if (reg < 0 || (reg > 1000 && reg > app_regs.REG_LED1_MAX_CURRENT))
+	if (reg < 0 || (reg > 500 && reg > app_regs.REG_LED1_MAX_CURRENT))
 	{
 		return false;
 	}

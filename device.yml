@@ -36,11 +36,11 @@ registers:
     access: Write
     minValue: 0
     maxValue: 1000
-    description: Configuration of current to drive LED 0 [0:1000] mA
+    description: Configuration of current to drive LED 0 [0:500] mA
   Led1Current:
     <<: *ledCurrent
     address: 38
-    description: Configuration of current to drive LED 1 [0:1000] mA
+    description: Configuration of current to drive LED 1 [0:500] mA
   Dac0Voltage: &dacVoltage
     address: 39
     type: Float
@@ -72,11 +72,11 @@ registers:
     access: Write
     minValue: 0
     maxValue: 1000
-    description: Configuration of current to drive LED 0 [0:1000] mA
+    description: Configuration of current to drive LED 0 [0:500] mA
   Led1MaxCurrent:
     <<: *ledMaxCurrent
     address: 45
-    description: Configuration of current to drive LED 1 [0:1000] mA
+    description: Configuration of current to drive LED 1 [0:500] mA
   PulseEnable:
     address: 46
     type: U8
