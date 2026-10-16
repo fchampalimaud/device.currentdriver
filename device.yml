@@ -44,35 +44,30 @@ registers:
     <<: *led
     address: 39
     description: Control the respective LED output
-  LedTargetState:
-    <<: *led
-    address: 40
-    access: Event
-    description: Sends an event when the LED reaches the target value
   Led0Current: &ledCurrent
-    address: 41
+    address: 40
     type: Float
     access: Write
     minValue: 0
-    maxValue: 1000
+    maxValue: 500
     description: Configuration of current to drive LED 0 [0:1000] mA
   Led1Current:
     <<: *ledCurrent
-    address: 42
+    address: 41
     description: Configuration of current to drive LED 1 [0:1000] mA
   Led0MaxCurrent: &ledMaxCurrent
-    address: 43
+    address: 42
     type: Float
     access: Write
     minValue: 0
-    maxValue: 1000
+    maxValue: 500
     description: Configuration of current to drive LED 0 [0:1000] mA
   Led1MaxCurrent:
     <<: *ledMaxCurrent
-    address: 44
+    address: 43
     description: Configuration of current to drive LED 1 [0:1000] mA
   Dac0Voltage: &dacVoltage
-    address: 45
+    address: 44
     type: Float
     access: Write
     minValue: 0
@@ -80,16 +75,16 @@ registers:
     description: Configuration of DAC 0 voltage [0:5000] mV
   Dac1Voltage:
     <<: *dacVoltage
-    address: 46
+    address: 45
     description: Configuration of DAC 1 voltage [0:5000] mV
   PulseEnable:
-    address: 47
+    address: 46
     type: U8
     access: Write
     maskType: LedOutputs
     description: Enables the pulse function for the specified output DACs/LEDs
   PulseDutyCycleLed0: &pulseDutyCycle
-    address: 48
+    address: 47
     type: U8
     access: Write
     minValue: 1
@@ -97,72 +92,76 @@ registers:
     description: Specifies the duty cycle of the output pulse from 1 to 100
   PulseDutyCycleLed1:
     <<: *pulseDutyCycle
-    address: 49
+    address: 48
     description: Specifies the duty cycle of the output pulse from 1 to 100
   PulseFrequencyLed0: &pulseFrequency
-    address: 50
+    address: 49
     type: U8
     access: Write
     minValue: 1
     description: Specifies the frequency of the output pulse in Hz
   PulseFrequencyLed1:
     <<: *pulseFrequency
-    address: 51
+    address: 50
     description: Specifies the frequency of the output pulse in Hz
   RampLed0: &ramp
-    address: 52
+    address: 51
     type: U16
     access: Write
     minValue: 1
     description: Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off
   RampLed1:
     <<: *ramp
-    address: 53
+    address: 52
     description: Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off
   RampConfig:
-    address: 54
+    address: 53
     type: U8
     access: Write
     maskType: LedRamps
     description: Specifies when the ramps are applied for each DAC/LED
   Protocol0Duration: &protocolDuration
-    address: 55
+    address: 54
     type: U16
     access: Write
     description: Specifies the duration of LED0 protocol
   Protocol1Duration:
     <<: *protocolDuration
-    address: 56
+    address: 55
     description: Specifies the duration of LED1 protocol
   Protocol0Delay: &protocolDelay
-    address: 57
+    address: 56
     type: U16
     access: Write
     description: Specifies the delay of the LED0 protocol
   Protocol1Delay:
     <<: *protocolDelay
-    address: 58
-    description: Specifies the delay of the LED1 protocol
+    address: 57
   EnableProtocol: &protocol
-    address: 59
+    address: 58
     type: U8
     access: Write
     maskType: LedOutputs
     description: Enable the respective protocol
   DisableProtocol:
     <<: *protocol
-    address: 60
+    address: 59
     description: Disable the respective protocol
-  DI0Trigger: &digitalInputTrigger
-    address: 61
+  Channel0Mode: &channelMode
+    address: 60
     type: U8
     access: Write
-    maskType: DITriggerConfig
-    description: Configures the callback function triggered when DI0 is triggered
-  DI1Trigger:
-    <<: *digitalInputTrigger
+    maskType: ChannelMode
+    description: Configures the mode of operation of channel 0
+  Channel1Mode:
+    <<: *channelMode
+    address: 61
+    description: Configures the mode of operation of channel 1
+  ChannelState:
     address: 62
-    description: Configures the callback function triggered when DI1 is triggered
+    type: U8
+    access: Event
+    description: Sends an event when the channel reaches LOW and HIGH state
   Reserved0: &reserved
     address: 63
     access: Read
@@ -178,8 +177,11 @@ registers:
   Reserved3:
     <<: *reserved
     address: 66
-  EnableEvents:
+  Reserved4:
+    <<: *reserved
     address: 67
+  EnableEvents:
+    address: 68
     access: Write
     type: U8
     maskType: CurrentDriverEvents
@@ -211,12 +213,12 @@ bitMasks:
     description: Specifies the active events in the device
     bits:
       DIs: 0x1
-      LedState: 0x2
+      ChannelState: 0x2
 groupMasks:
-  DITriggerConfig:
-    description: Specifies the way digital inputs work
+  ChannelMode:
+    description: Specifies the mode of operation of a channel
     values:
-      Digital: 0
-      ControlLed: 1
-      StartProtocol: 2
-      StartAndStopProtocol: 3
+      Manual: {value: 0, description: The voltage/current changes when the user sets a new value}
+      Protocol: {value: 1, description: The protocol settings must be defined beforehand and triggered in software}
+      StartProtocolTrigger: {value: 2, description: The protocol settings must be defined beforehand and triggered in hardware when the respective DI state changes from LOW to HIGH}
+      StartAndStopProtocolTrigger: {value: 3, description: The protocol starts when the respective DI state changes from LOW to HIGH and ends when it changes from HIGH to LOW}

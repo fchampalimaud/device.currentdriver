@@ -403,38 +403,6 @@ namespace Harp.CurrentDriver
         }
 
         /// <summary>
-        /// Asynchronously reads the contents of the <see cref="LedTargetState"/> register.
-        /// </summary>
-        /// <param name="cancellationToken">
-        /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
-        /// </param>
-        /// <returns>
-        /// A task that represents the asynchronous read operation. The task result contains
-        /// the register payload.
-        /// </returns>
-        public async Task<LedOutputs> ReadLedTargetStateAsync(CancellationToken cancellationToken = default)
-        {
-            var reply = await CommandAsync(HarpCommand.ReadByte(LedTargetState.Address), cancellationToken);
-            return LedTargetState.GetPayload(reply);
-        }
-
-        /// <summary>
-        /// Asynchronously reads the timestamped contents of the <see cref="LedTargetState"/> register.
-        /// </summary>
-        /// <param name="cancellationToken">
-        /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
-        /// </param>
-        /// <returns>
-        /// A task that represents the asynchronous read operation. The task result contains
-        /// the timestamped register payload.
-        /// </returns>
-        public async Task<Timestamped<LedOutputs>> ReadTimestampedLedTargetStateAsync(CancellationToken cancellationToken = default)
-        {
-            var reply = await CommandAsync(HarpCommand.ReadByte(LedTargetState.Address), cancellationToken);
-            return LedTargetState.GetTimestampedPayload(reply);
-        }
-
-        /// <summary>
         /// Asynchronously reads the contents of the <see cref="Led0Current"/> register.
         /// </summary>
         /// <param name="cancellationToken">
@@ -1355,7 +1323,7 @@ namespace Harp.CurrentDriver
         }
 
         /// <summary>
-        /// Asynchronously reads the contents of the <see cref="DI0Trigger"/> register.
+        /// Asynchronously reads the contents of the <see cref="Channel0Mode"/> register.
         /// </summary>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
@@ -1364,14 +1332,14 @@ namespace Harp.CurrentDriver
         /// A task that represents the asynchronous read operation. The task result contains
         /// the register payload.
         /// </returns>
-        public async Task<DITriggerConfig> ReadDI0TriggerAsync(CancellationToken cancellationToken = default)
+        public async Task<ChannelMode> ReadChannel0ModeAsync(CancellationToken cancellationToken = default)
         {
-            var reply = await CommandAsync(HarpCommand.ReadByte(DI0Trigger.Address), cancellationToken);
-            return DI0Trigger.GetPayload(reply);
+            var reply = await CommandAsync(HarpCommand.ReadByte(Channel0Mode.Address), cancellationToken);
+            return Channel0Mode.GetPayload(reply);
         }
 
         /// <summary>
-        /// Asynchronously reads the timestamped contents of the <see cref="DI0Trigger"/> register.
+        /// Asynchronously reads the timestamped contents of the <see cref="Channel0Mode"/> register.
         /// </summary>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
@@ -1380,28 +1348,28 @@ namespace Harp.CurrentDriver
         /// A task that represents the asynchronous read operation. The task result contains
         /// the timestamped register payload.
         /// </returns>
-        public async Task<Timestamped<DITriggerConfig>> ReadTimestampedDI0TriggerAsync(CancellationToken cancellationToken = default)
+        public async Task<Timestamped<ChannelMode>> ReadTimestampedChannel0ModeAsync(CancellationToken cancellationToken = default)
         {
-            var reply = await CommandAsync(HarpCommand.ReadByte(DI0Trigger.Address), cancellationToken);
-            return DI0Trigger.GetTimestampedPayload(reply);
+            var reply = await CommandAsync(HarpCommand.ReadByte(Channel0Mode.Address), cancellationToken);
+            return Channel0Mode.GetTimestampedPayload(reply);
         }
 
         /// <summary>
-        /// Asynchronously writes a value to the <see cref="DI0Trigger"/> register.
+        /// Asynchronously writes a value to the <see cref="Channel0Mode"/> register.
         /// </summary>
         /// <param name="value">The value to write in the register.</param>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
         /// </param>
         /// <returns>The task object representing the asynchronous write operation.</returns>
-        public async Task WriteDI0TriggerAsync(DITriggerConfig value, CancellationToken cancellationToken = default)
+        public async Task WriteChannel0ModeAsync(ChannelMode value, CancellationToken cancellationToken = default)
         {
-            var request = DI0Trigger.FromPayload(MessageType.Write, value);
+            var request = Channel0Mode.FromPayload(MessageType.Write, value);
             await CommandAsync(request, cancellationToken);
         }
 
         /// <summary>
-        /// Asynchronously reads the contents of the <see cref="DI1Trigger"/> register.
+        /// Asynchronously reads the contents of the <see cref="Channel1Mode"/> register.
         /// </summary>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
@@ -1410,14 +1378,14 @@ namespace Harp.CurrentDriver
         /// A task that represents the asynchronous read operation. The task result contains
         /// the register payload.
         /// </returns>
-        public async Task<DITriggerConfig> ReadDI1TriggerAsync(CancellationToken cancellationToken = default)
+        public async Task<ChannelMode> ReadChannel1ModeAsync(CancellationToken cancellationToken = default)
         {
-            var reply = await CommandAsync(HarpCommand.ReadByte(DI1Trigger.Address), cancellationToken);
-            return DI1Trigger.GetPayload(reply);
+            var reply = await CommandAsync(HarpCommand.ReadByte(Channel1Mode.Address), cancellationToken);
+            return Channel1Mode.GetPayload(reply);
         }
 
         /// <summary>
-        /// Asynchronously reads the timestamped contents of the <see cref="DI1Trigger"/> register.
+        /// Asynchronously reads the timestamped contents of the <see cref="Channel1Mode"/> register.
         /// </summary>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
@@ -1426,24 +1394,56 @@ namespace Harp.CurrentDriver
         /// A task that represents the asynchronous read operation. The task result contains
         /// the timestamped register payload.
         /// </returns>
-        public async Task<Timestamped<DITriggerConfig>> ReadTimestampedDI1TriggerAsync(CancellationToken cancellationToken = default)
+        public async Task<Timestamped<ChannelMode>> ReadTimestampedChannel1ModeAsync(CancellationToken cancellationToken = default)
         {
-            var reply = await CommandAsync(HarpCommand.ReadByte(DI1Trigger.Address), cancellationToken);
-            return DI1Trigger.GetTimestampedPayload(reply);
+            var reply = await CommandAsync(HarpCommand.ReadByte(Channel1Mode.Address), cancellationToken);
+            return Channel1Mode.GetTimestampedPayload(reply);
         }
 
         /// <summary>
-        /// Asynchronously writes a value to the <see cref="DI1Trigger"/> register.
+        /// Asynchronously writes a value to the <see cref="Channel1Mode"/> register.
         /// </summary>
         /// <param name="value">The value to write in the register.</param>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
         /// </param>
         /// <returns>The task object representing the asynchronous write operation.</returns>
-        public async Task WriteDI1TriggerAsync(DITriggerConfig value, CancellationToken cancellationToken = default)
+        public async Task WriteChannel1ModeAsync(ChannelMode value, CancellationToken cancellationToken = default)
         {
-            var request = DI1Trigger.FromPayload(MessageType.Write, value);
+            var request = Channel1Mode.FromPayload(MessageType.Write, value);
             await CommandAsync(request, cancellationToken);
+        }
+
+        /// <summary>
+        /// Asynchronously reads the contents of the <see cref="ChannelState"/> register.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
+        /// </param>
+        /// <returns>
+        /// A task that represents the asynchronous read operation. The task result contains
+        /// the register payload.
+        /// </returns>
+        public async Task<byte> ReadChannelStateAsync(CancellationToken cancellationToken = default)
+        {
+            var reply = await CommandAsync(HarpCommand.ReadByte(ChannelState.Address), cancellationToken);
+            return ChannelState.GetPayload(reply);
+        }
+
+        /// <summary>
+        /// Asynchronously reads the timestamped contents of the <see cref="ChannelState"/> register.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// A <see cref="CancellationToken"/> which can be used to cancel the operation.
+        /// </param>
+        /// <returns>
+        /// A task that represents the asynchronous read operation. The task result contains
+        /// the timestamped register payload.
+        /// </returns>
+        public async Task<Timestamped<byte>> ReadTimestampedChannelStateAsync(CancellationToken cancellationToken = default)
+        {
+            var reply = await CommandAsync(HarpCommand.ReadByte(ChannelState.Address), cancellationToken);
+            return ChannelState.GetTimestampedPayload(reply);
         }
 
         /// <summary>
