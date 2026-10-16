@@ -7,6 +7,7 @@
 #include "app_ios_and_regs.h"
 
 #include "structs.h"
+#include <util/atomic.h>
 
 #define F_CPU 32000000 //need to be defined for delay.h
 #include <util/delay.h>
@@ -66,8 +67,231 @@ void core_callback_catastrophic_error_detected(void)
 /************************************************************************/
 /* General definitions                                                  */
 /************************************************************************/
-Protocol protocol0;
-Protocol protocol1;
+
+/* Runtime state is private; all entry points below run with interrupts masked. */
+static volatile ChannelState channels[2];
+
+static uint8_t channel_mode(uint8_t channel)
+{
+    return channel ? app_regs.REG_CHANNEL1_MODE : app_regs.REG_CHANNEL0_MODE;
+}
+
+static void output_write(uint8_t channel, uint16_t value)
+{
+    if (channel)
+        latch_dac1(value);
+    else
+        latch_dac0(value);
+    channels[channel].output.applied_value = value;
+}
+
+static uint16_t configured_target(uint8_t channel)
+{
+    float voltage = channel ? app_regs.REG_DAC1_VOLTAGE : app_regs.REG_DAC0_VOLTAGE;
+    return (uint16_t)(voltage / 5000.0f * 65535.0f);
+}
+
+static void output_configure(uint8_t channel, bool preserve_phase)
+{
+    volatile OutputState *output = &channels[channel].output;
+    bool pulses = (app_regs.REG_PULSE_ENABLE & (channel ? B_LED1 : B_LED0)) != 0;
+
+    if (pulses) {
+        uint8_t frequency = channel ? app_regs.REG_PULSE_FREQUENCY_LED1 : app_regs.REG_PULSE_FREQUENCY_LED0;
+        uint8_t duty = channel ? app_regs.REG_PULSE_DCYCLE_LED1 : app_regs.REG_PULSE_DCYCLE_LED0;
+        uint16_t period = (2000U + frequency / 2U) / frequency;
+        uint16_t on_ticks = ((uint32_t)period * duty + 50U) / 100U;
+        bool keep_phase = preserve_phase && output->kind == WAVEFORM_PULSE &&
+            output->waveform.pulse.off_ticks != 0;
+
+        if (on_ticks == 0)
+            on_ticks = 1;
+        if (duty < 100 && on_ticks >= period)
+            on_ticks = period - 1;
+        if (!keep_phase || duty == 100) {
+            output->waveform.pulse.on = true;
+            output->waveform.pulse.remaining_ticks = on_ticks;
+        }
+        output->kind = WAVEFORM_PULSE;
+        output->waveform.pulse.on_ticks = on_ticks;
+        output->waveform.pulse.off_ticks = period - on_ticks;
+    } else {
+        output->kind = WAVEFORM_LEVEL;
+        output->waveform.ramp.rise_enabled = (app_regs.REG_RAMP_CONFIG & (channel ? B_LED1_RISE : B_LED0_RISE)) != 0;
+        output->waveform.ramp.fall_enabled = (app_regs.REG_RAMP_CONFIG & (channel ? B_LED1_FALL : B_LED0_FALL)) != 0;
+        output->waveform.ramp.duration_ms = channel ? app_regs.REG_RAMP_LED1 : app_regs.REG_RAMP_LED0;
+        output->waveform.ramp.remaining_ticks = 0;
+    }
+}
+
+static void output_begin(uint8_t channel, uint16_t target)
+{
+    volatile OutputState *output = &channels[channel].output;
+    output->target = target;
+    if (output->kind == WAVEFORM_PULSE) {
+        output_write(channel, output->waveform.pulse.on ? target : 0);
+    } else {
+        volatile RampState *ramp = &output->waveform.ramp;
+        bool rising = target > output->applied_value;
+        bool enabled = rising ? ramp->rise_enabled : ramp->fall_enabled;
+        uint16_t delta = rising ? target - output->applied_value : output->applied_value - target;
+
+        ramp->remaining_ticks = 0;
+        if (delta && enabled && ramp->duration_ms) {
+            ramp->rising = rising;
+            ramp->total_ticks = (uint32_t)ramp->duration_ms * 2U;
+            ramp->remaining_ticks = ramp->total_ticks;
+            ramp->step = delta / ramp->total_ticks;
+            ramp->remainder = delta % ramp->total_ticks;
+            ramp->error = 0;
+        } else {
+            output_write(channel, target);
+        }
+    }
+}
+
+static bool output_settled(uint8_t channel)
+{
+    return channels[channel].output.kind == WAVEFORM_PULSE ||
+        channels[channel].output.waveform.ramp.remaining_ticks == 0;
+}
+
+static void output_tick(uint8_t channel)
+{
+    volatile OutputState *output = &channels[channel].output;
+    if (output->kind == WAVEFORM_PULSE) {
+        volatile PulseState *pulse = &output->waveform.pulse;
+        /* A 100% duty cycle has no OFF phase. */
+        if (pulse->off_ticks == 0)
+            return;
+        if (pulse->remaining_ticks && --pulse->remaining_ticks == 0) {
+            pulse->on = !pulse->on;
+            pulse->remaining_ticks = pulse->on ? pulse->on_ticks : pulse->off_ticks;
+            output_write(channel, pulse->on ? output->target : 0);
+        }
+    } else {
+        volatile RampState *ramp = &output->waveform.ramp;
+        if (ramp->remaining_ticks) {
+            uint16_t step = ramp->step;
+            ramp->error += ramp->remainder;
+            if (ramp->error >= ramp->total_ticks) {
+                ramp->error -= ramp->total_ticks;
+                step++;
+            }
+            --ramp->remaining_ticks;
+            output_write(channel, ramp->remaining_ticks == 0 ? output->target :
+                (ramp->rising ? output->applied_value + step : output->applied_value - step));
+        }
+    }
+}
+
+static void protocol_stop(uint8_t channel)
+{
+    volatile OutputState *output = &channels[channel].output;
+    if (channels[channel].protocol.phase == PROTOCOL_IDLE)
+        return;
+    if (channels[channel].protocol.phase == PROTOCOL_DELAY || output->kind == WAVEFORM_PULSE) {
+        output->kind = WAVEFORM_LEVEL;
+        output->waveform.ramp.remaining_ticks = 0;
+        output->target = 0;
+        output_write(channel, 0);
+    } else {
+        output_begin(channel, 0);
+    }
+    channels[channel].protocol.phase = output_settled(channel) ? PROTOCOL_IDLE : PROTOCOL_STOPPING;
+}
+
+void channel_reset(uint8_t channel)
+{
+    ChannelState reset = {0};
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        channels[channel] = reset;
+        output_write(channel, 0);
+    }
+}
+
+void channel_apply_manual(uint8_t channel)
+{
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        channels[channel].protocol.phase = PROTOCOL_IDLE;
+        output_configure(channel, true);
+        output_begin(channel, configured_target(channel));
+    }
+}
+
+void channel_start_protocol(uint8_t channel)
+{
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        volatile ProtocolState *protocol = &channels[channel].protocol;
+        /* Retriggering starts a fresh execution, including a new delay. */
+        output_write(channel, 0);
+        output_configure(channel, false);
+        channels[channel].output.target = configured_target(channel);
+        protocol->delay_ticks = (uint32_t)(channel ? app_regs.REG_PROTOCOL1_DELAY : app_regs.REG_PROTOCOL0_DELAY) * 2U;
+        protocol->duration_ticks = (uint32_t)(channel ? app_regs.REG_PROTOCOL1_DURATION : app_regs.REG_PROTOCOL0_DURATION) * 2U;
+        protocol->has_duration = channel_mode(channel) != GM_START_AND_STOP_PROTOCOL_TRIGGER && protocol->duration_ticks != 0;
+        if (protocol->delay_ticks) {
+            protocol->phase = PROTOCOL_DELAY;
+        } else {
+            output_begin(channel, channels[channel].output.target);
+            protocol->phase = output_settled(channel) ? PROTOCOL_HOLD : PROTOCOL_STARTING;
+        }
+    }
+}
+
+void channel_stop_protocol(uint8_t channel)
+{
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        protocol_stop(channel);
+    }
+}
+
+bool channel_set_mode(uint8_t channel, uint8_t mode)
+{
+    if (mode > GM_START_AND_STOP_PROTOCOL_TRIGGER)
+        return false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        if (mode != channel_mode(channel)) {
+            channel_reset(channel);
+            if (channel)
+                app_regs.REG_CHANNEL1_MODE = mode;
+            else
+                app_regs.REG_CHANNEL0_MODE = mode;
+            if (mode == GM_MANUAL)
+                channel_apply_manual(channel);
+        }
+    }
+    return true;
+}
+
+void channels_tick_500us(void)
+{
+    uint8_t channel;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        for (channel = 0; channel < 2; channel++) {
+            volatile ProtocolState *protocol = &channels[channel].protocol;
+            if (protocol->phase == PROTOCOL_DELAY) {
+                if (--protocol->delay_ticks == 0) {
+                    output_begin(channel, channels[channel].output.target);
+                    protocol->phase = output_settled(channel) ? PROTOCOL_HOLD : PROTOCOL_STARTING;
+                }
+                continue;
+            }
+            if (protocol->phase == PROTOCOL_HOLD && protocol->has_duration) {
+                if (--protocol->duration_ticks == 0) {
+                    protocol_stop(channel);
+                    continue;
+                }
+            }
+            output_tick(channel);
+            if (protocol->phase == PROTOCOL_STARTING && output_settled(channel))
+                protocol->phase = PROTOCOL_HOLD;
+            else if (protocol->phase == PROTOCOL_STOPPING && output_settled(channel))
+                protocol->phase = PROTOCOL_IDLE;
+        }
+    }
+}
+
 
 /************************************************************************/
 /* User functions                                                       */
@@ -139,8 +363,8 @@ void core_callback_reset_registers(void)
 
 void core_callback_registers_were_reinitialized(void)
 {
-	protocol0.state = OFF;
-	protocol1.state = OFF;
+	channel_reset(0);
+	channel_reset(1);
 	
 }
 
@@ -173,159 +397,9 @@ void core_callback_device_to_speed(void) {}
 void core_callback_t_before_exec(void) {}
 void core_callback_t_after_exec(void) {}
 void core_callback_t_new_second(void) {}
-void core_callback_t_500us(void) 
+void core_callback_t_500us(void)
 {
-	if (protocol0.state == DELAY)
-	{
-		if (protocol0.delay == 0 && protocol0.ramps.use_ramps & B_LED0_RISE)
-		{
-			protocol0.state = RISE;
-		} else if (protocol0.delay == 0 && ~(protocol0.ramps.use_ramps & B_LED0_RISE)) {
-			latch_dac0(protocol0.target);
-			protocol0.state = ON;
-		}
-		protocol0.delay--;
-	} else if (protocol0.state == RISE) {
-		if (protocol0.ramps.countdown_rise > 0)
-		{
-			if (protocol0.ramps.remainder_rise > 0) {
-				protocol0.ramps.previous_value += protocol0.ramps.cycle_amount + 1;
-				protocol0.ramps.remainder_rise--;
-			} else {
-				protocol0.ramps.previous_value += protocol0.ramps.cycle_amount;
-			}
-			latch_dac0(protocol0.ramps.previous_value);
-			protocol0.ramps.countdown_rise--;
-		} else {
-			protocol0.state = ON;
-		}
-	} else if (protocol0.state == ON) {
-		if (protocol0.has_duration) {
-			if (protocol0.duration > 0)
-			{
-				protocol0.duration--;
-			} else if (protocol0.ramps.use_ramps & B_LED0_FALL) {
-				protocol0.ramps.previous_value = protocol0.target;
-				protocol0.state = FALL;
-			} else {
-				latch_dac0(0);
-				protocol0.state = OFF;
-			}
-		}
-
-		if (protocol0.pulses.use_pulses)
-		{
-			if (--protocol0.pulses.countdown <= 0)
-			{
-				if (protocol0.pulses.state)
-				{
-					protocol0.pulses.countdown = protocol0.pulses.time_off;
-					protocol0.pulses.state = false;
-					latch_dac0(0);
-				} else {
-					protocol0.pulses.countdown = protocol0.pulses.time_on;
-					protocol0.pulses.state = true;
-					latch_dac0((uint16_t)(protocol0.target));
-				}
-			}
-		}
-	} else if (protocol0.state == FALL) {
-		if (protocol0.ramps.countdown_fall > 0)
-		{
-			if (protocol0.ramps.remainder_fall > 0) {
-				protocol0.ramps.previous_value -= protocol0.ramps.cycle_amount + 1;
-				protocol0.ramps.remainder_fall--;
-			} else {
-				protocol0.ramps.previous_value -= protocol0.ramps.cycle_amount;
-			}
-			latch_dac0(protocol0.ramps.previous_value);
-			protocol0.ramps.countdown_fall--;
-		} else {
-			if (app_regs.REG_CHANNEL0_MODE == GM_MANUAL) {
-				latch_dac0(protocol0.target);
-				protocol0.state = ON;
-			} else {
-				latch_dac0(0);
-				protocol0.state = OFF;
-			}
-		}
-	}
-
-	if (protocol1.state == DELAY)
-	{
-		if (protocol1.delay == 0 && protocol1.ramps.use_ramps & B_LED1_RISE)
-		{
-			protocol1.state = RISE;
-		} else if (protocol1.delay == 0 && ~(protocol1.ramps.use_ramps & B_LED1_RISE)) {
-			latch_dac1(protocol1.target);
-			protocol1.state = ON;
-		}
-		protocol1.delay--;
-	} else if (protocol1.state == RISE) {
-		if (protocol1.ramps.countdown_rise > 0)
-		{
-			if (protocol1.ramps.remainder_rise > 0) {
-				protocol1.ramps.previous_value += protocol1.ramps.cycle_amount + 1;
-				protocol1.ramps.remainder_rise--;
-			} else {
-				protocol1.ramps.previous_value += protocol1.ramps.cycle_amount;
-			}
-			latch_dac1(protocol1.ramps.previous_value);
-			protocol1.ramps.countdown_rise--;
-		} else {
-			protocol1.state = ON;
-		}
-	} else if (protocol1.state == ON) {
-		if (protocol1.has_duration) {
-			if (protocol1.duration > 0)
-			{
-				protocol1.duration--;
-			} else if (protocol1.ramps.use_ramps & B_LED1_FALL) {
-				protocol1.ramps.previous_value = protocol1.target;
-				protocol1.state = FALL;
-			} else {
-				latch_dac1(0);
-				protocol1.state = OFF;
-			}
-		}
-
-		if (protocol1.pulses.use_pulses)
-		{
-			if (--protocol1.pulses.countdown <= 0)
-			{
-				if (protocol1.pulses.state)
-				{
-					protocol1.pulses.countdown = protocol1.pulses.time_off;
-					protocol1.pulses.state = false;
-					latch_dac1(0);
-				} else {
-					protocol1.pulses.countdown = protocol1.pulses.time_on;
-					protocol1.pulses.state = true;
-					latch_dac1((uint16_t)(protocol1.target));
-				}
-			}
-		}
-	} else if (protocol1.state == FALL) {
-		if (protocol1.ramps.countdown_fall > 0)
-		{
-			if (protocol1.ramps.remainder_fall > 0) {
-				protocol1.ramps.previous_value -= protocol1.ramps.cycle_amount + 1;
-				protocol1.ramps.remainder_fall--;
-			} else {
-				protocol1.ramps.previous_value -= protocol1.ramps.cycle_amount;
-			}
-			latch_dac1(protocol1.ramps.previous_value);
-			protocol1.ramps.countdown_fall--;
-		} else {
-			if (app_regs.REG_CHANNEL1_MODE == GM_MANUAL) {
-				latch_dac1(protocol1.target);
-				protocol1.state = ON;
-			} else {
-				latch_dac1(0);
-				protocol1.state = OFF;
-			}
-		}
-	}
+    channels_tick_500us();
 }
 void core_callback_t_1ms(void) {}
 
@@ -386,5 +460,9 @@ bool core_write_app_register(uint8_t add, uint8_t type, uint8_t * content, uint1
 		return false;
 
 	/* Process data and return false if write is not allowed or contains errors */
-	return (*app_func_wr_pointer[add-APP_REGS_ADD_MIN])(content);
+	bool result;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        result = (*app_func_wr_pointer[add-APP_REGS_ADD_MIN])(content);
+    }
+    return result;
 }

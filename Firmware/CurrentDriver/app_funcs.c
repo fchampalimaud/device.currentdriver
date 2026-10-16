@@ -7,13 +7,38 @@
 
 #include "structs.h"
 
-extern Protocol protocol0;
-extern Protocol protocol1;
 
 /************************************************************************/
 /* Create pointers to functions                                         */
 /************************************************************************/
 extern AppRegs app_regs;
+
+/* Current and voltage writes share validation, conversion and execution. */
+static bool channel_write_setpoint(uint8_t channel, float value, bool current)
+{
+    float max_current = channel ? app_regs.REG_LED1_MAX_CURRENT : app_regs.REG_LED0_MAX_CURRENT;
+    bool driver_enabled = channel ? !read_I_OFF_DAC1 : !read_I_OFF_DAC0;
+    float voltage;
+    uint8_t mode = channel ? app_regs.REG_CHANNEL1_MODE : app_regs.REG_CHANNEL0_MODE;
+
+    /* Ordered comparisons also reject NaN and infinities. */
+    if (!(value >= 0 && value <= (current ? 500.0f : 5000.0f)))
+        return false;
+    voltage = current ? value * 10.0f : value;
+    if ((current || driver_enabled) && voltage / 10.0f > max_current)
+        return false;
+    if (channel) {
+        app_regs.REG_LED1_CURRENT = voltage / 10.0f;
+        app_regs.REG_DAC1_VOLTAGE = voltage;
+    } else {
+        app_regs.REG_LED0_CURRENT = voltage / 10.0f;
+        app_regs.REG_DAC0_VOLTAGE = voltage;
+    }
+    if (mode == GM_MANUAL)
+        channel_apply_manual(channel);
+    return true;
+}
+
 
 void (*app_func_rd_pointer[])(void) = {
 	&app_read_REG_PORT_DIS,
@@ -195,17 +220,15 @@ bool app_write_REG_OUTPUTS_OUT(void *a)
 /************************************************************************/
 /* LATCH_DAC0                                                           */
 /************************************************************************/
-uint16_t aux_u16b;
 void latch_dac0(uint16_t word)
 {
 	clr_CS0;
-	aux_u16b = word;
 
 	// 16 bit code latch
-	SPID_DATA = *(((uint8_t *)(&aux_u16b)) + 1);
+	SPID_DATA = *(((uint8_t *)(&word)) + 1);
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
-	SPID_DATA = *(((uint8_t *)(&aux_u16b)) + 0);
+	SPID_DATA = *(((uint8_t *)(&word)) + 0);
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
 	set_CS0;
@@ -217,13 +240,12 @@ void latch_dac0(uint16_t word)
 void latch_dac1(uint16_t word)
 {
 	clr_CS1;
-	aux_u16b = word;
 
 	// 16 bit code latch
-	SPID_DATA = *(((uint8_t *)(&aux_u16b)) + 1);
+	SPID_DATA = *(((uint8_t *)(&word)) + 1);
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
-	SPID_DATA = *(((uint8_t *)(&aux_u16b)) + 0);
+	SPID_DATA = *(((uint8_t *)(&word)) + 0);
 	loop_until_bit_is_set(SPID_STATUS, SPI_IF_bp);
 
 	set_CS1;
@@ -334,48 +356,7 @@ bool app_write_REG_LED_OUT(void *a)
 void app_read_REG_LED0_CURRENT(void) {}
 bool app_write_REG_LED0_CURRENT(void *a)
 {
-	float reg = *((float *)a);
-
-	if (reg < 0 || (reg > 500 && reg > app_regs.REG_LED0_MAX_CURRENT))
-	{
-		return false;
-	}
-
-	if (app_regs.REG_CHANNEL0_MODE == GM_MANUAL)
-	{
-		protocol0.pulses.use_pulses = (bool)(app_regs.REG_PULSE_ENABLE & B_LED0);
-		protocol0.pulses.state = false;
-		protocol0.pulses.time_on = app_regs.REG_PULSE_DCYCLE_LED0 / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
-		protocol0.pulses.time_off = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED0 - protocol0.pulses.time_on + 1;
-		protocol0.pulses.countdown = protocol0.pulses.time_on;
-
-		protocol0.ramps.use_ramps = protocol0.pulses.use_pulses ? 0 : app_regs.REG_RAMP_CONFIG;
-		protocol0.ramps.cycle_amount = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000 * 65535) / app_regs.REG_RAMP_LED0);
-		protocol0.ramps.remainder_rise = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000 * 65535) - protocol0.ramps.cycle_amount * app_regs.REG_RAMP_LED0);
-		protocol0.ramps.remainder_fall = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000 * 65535) - protocol0.ramps.cycle_amount * app_regs.REG_RAMP_LED0);
-		protocol0.ramps.previous_value = 0;
-		protocol0.ramps.countdown_rise = app_regs.REG_RAMP_LED0;
-		protocol0.ramps.countdown_fall = app_regs.REG_RAMP_LED0;
-
-		protocol0.delay = 0;
-		protocol0.duration = app_regs.REG_PROTOCOL0_DURATION;
-		protocol0.has_duration = false;
-		protocol0.target = reg / 500 * 65535;
-
-		if (protocol0.ramps.use_ramps & B_LED0_RISE)
-		{
-			protocol0.state = RISE;
-		}
-		else
-		{
-			protocol0.state = ON;
-		}
-	}
-
-	app_regs.REG_LED0_CURRENT = reg;
-	app_regs.REG_DAC0_VOLTAGE = 10 * reg;
-
-	return true;
+    return channel_write_setpoint(0, *((float *)a), true);
 }
 
 /************************************************************************/
@@ -384,48 +365,7 @@ bool app_write_REG_LED0_CURRENT(void *a)
 void app_read_REG_LED1_CURRENT(void) {}
 bool app_write_REG_LED1_CURRENT(void *a)
 {
-	float reg = *((float *)a);
-
-	if (reg < 0 || (reg > 500 && reg > app_regs.REG_LED1_MAX_CURRENT))
-	{
-		return false;
-	}
-
-	if (app_regs.REG_CHANNEL1_MODE == GM_MANUAL)
-	{
-		protocol1.pulses.use_pulses = (bool)(app_regs.REG_PULSE_ENABLE & B_LED0);
-		protocol1.pulses.state = false;
-		protocol1.pulses.time_on = app_regs.REG_PULSE_DCYCLE_LED1 / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
-		protocol1.pulses.time_off = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED1 - protocol1.pulses.time_on + 1;
-		protocol1.pulses.countdown = protocol1.pulses.time_on;
-
-		protocol1.ramps.use_ramps = protocol1.pulses.use_pulses ? 0 : app_regs.REG_RAMP_CONFIG;
-		protocol1.ramps.cycle_amount = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000 * 65535) / app_regs.REG_RAMP_LED1);
-		protocol1.ramps.remainder_rise = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000 * 65535) - protocol1.ramps.cycle_amount * app_regs.REG_RAMP_LED1);
-		protocol1.ramps.remainder_fall = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000 * 65535) - protocol1.ramps.cycle_amount * app_regs.REG_RAMP_LED1);
-		protocol1.ramps.previous_value = 0;
-		protocol1.ramps.countdown_rise = app_regs.REG_RAMP_LED1;
-		protocol1.ramps.countdown_fall = app_regs.REG_RAMP_LED1;
-
-		protocol1.delay = 0;
-		protocol1.duration = app_regs.REG_PROTOCOL1_DURATION;
-		protocol1.has_duration = false;
-		protocol1.target = reg / 500 * 65535;
-
-		if (protocol1.ramps.use_ramps & B_LED1_RISE)
-		{
-			protocol1.state = RISE;
-		}
-		else
-		{
-			protocol1.state = ON;
-		}
-	}
-
-	app_regs.REG_LED1_CURRENT = reg;
-	app_regs.REG_DAC1_VOLTAGE = 10 * reg;
-
-	return true;
+    return channel_write_setpoint(1, *((float *)a), true);
 }
 
 /************************************************************************/
@@ -482,53 +422,7 @@ bool app_write_REG_LED1_MAX_CURRENT(void *a)
 void app_read_REG_DAC0_VOLTAGE(void) {}
 bool app_write_REG_DAC0_VOLTAGE(void *a)
 {
-	float reg = *((float *)a);
-
-	if (reg < 0 || reg > 5000 || ((reg / 10) > app_regs.REG_LED0_MAX_CURRENT && app_regs.REG_LED_OUT & B_LED0))
-	{
-		return false;
-	}
-
-	if (app_regs.REG_CHANNEL0_MODE == GM_MANUAL)
-	{
-		protocol0.pulses.use_pulses = (bool)(app_regs.REG_PULSE_ENABLE & B_LED0);
-		protocol0.pulses.state = false;
-		protocol0.pulses.time_on = app_regs.REG_PULSE_DCYCLE_LED0 / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
-		protocol0.pulses.time_off = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED0 - protocol0.pulses.time_on + 1;
-		protocol0.pulses.countdown = protocol0.pulses.time_on;
-
-		protocol0.delay = 0;
-		protocol0.duration = app_regs.REG_PROTOCOL0_DURATION;
-		protocol0.has_duration = false;
-		protocol0.target = reg / 5000 * 65535;
-
-		protocol0.ramps.use_ramps = protocol0.pulses.use_pulses ? 0 : app_regs.REG_RAMP_CONFIG;
-		if (protocol0.target > protocol0.ramps.previous_value && protocol0.ramps.use_ramps & B_LED0_RISE)
-		{
-			protocol0.ramps.cycle_amount = (uint16_t)((protocol0.target - protocol0.ramps.previous_value) / app_regs.REG_RAMP_LED0);
-			protocol0.ramps.remainder_rise = (uint16_t)((protocol0.target - protocol0.ramps.previous_value) - protocol0.ramps.cycle_amount * app_regs.REG_RAMP_LED0);
-			protocol0.ramps.countdown_rise = app_regs.REG_RAMP_LED0;
-			protocol0.state = RISE;
-		}
-		else if (protocol0.target < protocol0.ramps.previous_value && protocol0.ramps.use_ramps & B_LED0_FALL)
-		{
-			protocol0.ramps.cycle_amount = (uint16_t)((protocol0.ramps.previous_value - protocol0.target) / app_regs.REG_RAMP_LED0);
-			protocol0.ramps.remainder_fall = (uint16_t)((protocol0.ramps.previous_value - protocol0.target) - protocol0.ramps.cycle_amount * app_regs.REG_RAMP_LED0);
-			protocol0.ramps.countdown_fall = app_regs.REG_RAMP_LED0;
-			protocol0.state = FALL;
-		}
-		else
-		{
-			latch_dac0(protocol0.target);
-			protocol0.state = ON;
-			protocol0.ramps.previous_value = protocol0.target
-		}
-	}
-
-	app_regs.REG_LED0_CURRENT = reg / 10;
-	app_regs.REG_DAC0_VOLTAGE = reg;
-
-	return true;
+    return channel_write_setpoint(0, *((float *)a), false);
 }
 
 /************************************************************************/
@@ -537,57 +431,7 @@ bool app_write_REG_DAC0_VOLTAGE(void *a)
 void app_read_REG_DAC1_VOLTAGE(void) {}
 bool app_write_REG_DAC1_VOLTAGE(void *a)
 {
-	float reg = *((float *)a);
-
-	if (reg < 0 || reg > 5000)
-	{
-		return false;
-	}
-
-	if (reg < 0 || reg > 5000 || ((reg / 10) > app_regs.REG_LED1_MAX_CURRENT && app_regs.REG_LED_OUT & B_LED1))
-	{
-		return false;
-	}
-
-	if (app_regs.REG_CHANNEL1_MODE == GM_MANUAL)
-	{
-		protocol1.pulses.use_pulses = (bool)(app_regs.REG_PULSE_ENABLE & B_LED0);
-		protocol1.pulses.state = false;
-		protocol1.pulses.time_on = app_regs.REG_PULSE_DCYCLE_LED1 / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
-		protocol1.pulses.time_off = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED1 - protocol1.pulses.time_on + 1;
-		protocol1.pulses.countdown = protocol1.pulses.time_on;
-
-		protocol1.delay = 0;
-		protocol1.duration = app_regs.REG_PROTOCOL1_DURATION;
-		protocol1.has_duration = false;
-		protocol1.target = reg / 5000 * 65535;
-
-		protocol1.ramps.use_ramps = protocol1.pulses.use_pulses ? 0 : app_regs.REG_RAMP_CONFIG;
-		if (protocol1.target > protocol1.ramps.previous_value && protocol1.ramps.use_ramps & B_LED1_RISE)
-		{
-			protocol1.ramps.cycle_amount = (uint16_t)((protocol1.target - protocol1.ramps.previous_value) / app_regs.REG_RAMP_LED1);
-			protocol1.ramps.remainder_rise = (uint16_t)((protocol1.target - protocol1.ramps.previous_value) - protocol1.ramps.cycle_amount * app_regs.REG_RAMP_LED1);
-			protocol1.ramps.countdown_rise = app_regs.REG_RAMP_LED1;
-			protocol1.state = RISE;
-		}
-		else if (protocol1.target < protocol1.ramps.previous_value && protocol1.ramps.use_ramps & B_LED1_FALL)
-		{
-			protocol1.ramps.cycle_amount = (uint16_t)((protocol1.ramps.previous_value - protocol1.target) / app_regs.REG_RAMP_LED1);
-			protocol1.ramps.remainder_fall = (uint16_t)((protocol1.ramps.previous_value - protocol1.target) - protocol1.ramps.cycle_amount * app_regs.REG_RAMP_LED1);
-			protocol1.ramps.countdown_fall = app_regs.REG_RAMP_LED1;
-			protocol1.state = FALL;
-		}
-		else
-		{
-			latch_dac1(protocol1.target);
-			protocol1.state = ON;
-		}
-	}
-
-	app_regs.REG_LED1_CURRENT = reg / 10;
-	app_regs.REG_DAC1_VOLTAGE = reg;
-
-	return true;
+    return channel_write_setpoint(1, *((float *)a), false);
 }
 
 /************************************************************************/
@@ -770,80 +614,13 @@ bool app_write_REG_PROTOCOL1_DELAY(void *a)
 void app_read_REG_ENABLE_PROTOCOL(void) {}
 bool app_write_REG_ENABLE_PROTOCOL(void *a)
 {
-	uint8_t reg = *((uint8_t *)a);
-
-	if (reg & B_LED0 && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
-	{
-		protocol0.pulses.use_pulses = (bool)(app_regs.REG_PULSE_ENABLE & B_LED0);
-		protocol0.pulses.state = false;
-		protocol0.pulses.time_on = app_regs.REG_PULSE_DCYCLE_LED0 / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED0) * 1000.0 + 1;
-		protocol0.pulses.time_off = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED0 - protocol0.pulses.time_on + 1;
-		protocol0.pulses.countdown = protocol0.pulses.time_on;
-
-		protocol0.ramps.use_ramps = protocol0.pulses.use_pulses ? 0 : app_regs.REG_RAMP_CONFIG;
-		protocol0.ramps.cycle_amount = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000 * 65535) / app_regs.REG_RAMP_LED0);
-		protocol0.ramps.remainder_rise = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000 * 65535) - protocol0.ramps.cycle_amount * app_regs.REG_RAMP_LED0);
-		protocol0.ramps.remainder_fall = (uint16_t)((app_regs.REG_DAC0_VOLTAGE / 5000 * 65535) - protocol0.ramps.cycle_amount * app_regs.REG_RAMP_LED0);
-		protocol0.ramps.previous_value = 0;
-		protocol0.ramps.countdown_rise = app_regs.REG_RAMP_LED0;
-		protocol0.ramps.countdown_fall = app_regs.REG_RAMP_LED0;
-
-		protocol0.delay = app_regs.REG_PROTOCOL0_DELAY;
-		protocol0.duration = app_regs.REG_PROTOCOL0_DURATION;
-		protocol0.has_duration = (bool)(app_regs.REG_PROTOCOL0_DURATION);
-		protocol0.target = app_regs.REG_DAC0_VOLTAGE / 5000 * 65535;
-
-		if (protocol0.delay != 0)
-		{
-			protocol0.state = DELAY;
-		}
-		else if (protocol0.ramps.use_ramps & B_LED0_RISE)
-		{
-			protocol0.state = RISE;
-		}
-		else
-		{
-			protocol0.state = ON;
-		}
-	}
-
-	if (reg & B_LED1 && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
-	{
-		protocol1.pulses.use_pulses = (bool)(app_regs.REG_PULSE_ENABLE & B_LED1);
-		protocol1.pulses.state = false;
-		protocol1.pulses.time_on = app_regs.REG_PULSE_DCYCLE_LED1 / (100.0 * app_regs.REG_PULSE_FREQUENCY_LED1) * 1000.0 + 1;
-		protocol1.pulses.time_off = 1000.0 / app_regs.REG_PULSE_FREQUENCY_LED1 - protocol1.pulses.time_on + 1;
-		protocol1.pulses.countdown = protocol1.pulses.time_on;
-
-		protocol1.ramps.use_ramps = protocol1.pulses.use_pulses ? 0 : app_regs.REG_RAMP_CONFIG;
-		protocol1.ramps.cycle_amount = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000 * 65535) / app_regs.REG_RAMP_LED1);
-		protocol1.ramps.remainder_rise = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000 * 65535) - protocol1.ramps.cycle_amount * app_regs.REG_RAMP_LED1);
-		protocol1.ramps.remainder_fall = (uint16_t)((app_regs.REG_DAC1_VOLTAGE / 5000 * 65535) - protocol1.ramps.cycle_amount * app_regs.REG_RAMP_LED1);
-		protocol1.ramps.previous_value = 0;
-		protocol1.ramps.countdown_rise = app_regs.REG_RAMP_LED1;
-		protocol1.ramps.countdown_fall = app_regs.REG_RAMP_LED1;
-
-		protocol1.delay = app_regs.REG_PROTOCOL1_DELAY;
-		protocol1.duration = app_regs.REG_PROTOCOL1_DURATION;
-		protocol1.has_duration = (bool)(app_regs.REG_PROTOCOL1_DURATION);
-		protocol1.target = app_regs.REG_DAC1_VOLTAGE / 5000 * 65535;
-
-		if (protocol1.delay != 0)
-		{
-			protocol1.state = DELAY;
-		}
-		else if (protocol1.ramps.use_ramps & B_LED1_RISE)
-		{
-			protocol1.state = RISE;
-		}
-		else
-		{
-			protocol1.state = ON;
-		}
-	}
-
-	app_regs.REG_ENABLE_PROTOCOL = reg;
-	return true;
+    uint8_t reg = *((uint8_t *)a);
+    if ((reg & B_LED0) && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
+        channel_start_protocol(0);
+    if ((reg & B_LED1) && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
+        channel_start_protocol(1);
+    app_regs.REG_ENABLE_PROTOCOL = reg;
+    return true;
 }
 
 /************************************************************************/
@@ -852,34 +629,13 @@ bool app_write_REG_ENABLE_PROTOCOL(void *a)
 void app_read_REG_DISABLE_PROTOCOL(void) {}
 bool app_write_REG_DISABLE_PROTOCOL(void *a)
 {
-	uint8_t reg = *((uint8_t *)a);
-
-	if (reg & B_LED0 && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
-	{
-		if (protocol0.ramps.use_ramps & B_LED0_FALL && (protocol0.state == RISE || protocol0.state == FALL))
-		{
-			protocol0.state = FALL;
-		}
-		else if (protocol0.ramps.use_ramps & B_LED0_FALL && protocol0.state == ON)
-		{
-			protocol0.ramps.previous_value = protocol0.target;
-			protocol0.state = FALL;
-		}
-		else
-		{
-			latch_dac0(0);
-			protocol0.state = OFF;
-		}
-	}
-
-	if (reg & B_LED1 && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
-	{
-		latch_dac1(0);
-		protocol1.state = OFF;
-	}
-
-	app_regs.REG_DISABLE_PROTOCOL = reg;
-	return true;
+    uint8_t reg = *((uint8_t *)a);
+    if ((reg & B_LED0) && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
+        channel_stop_protocol(0);
+    if ((reg & B_LED1) && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
+        channel_stop_protocol(1);
+    app_regs.REG_DISABLE_PROTOCOL = reg;
+    return true;
 }
 
 /************************************************************************/
@@ -889,21 +645,7 @@ void app_read_REG_CHANNEL0_MODE(void) {}
 
 bool app_write_REG_CHANNEL0_MODE(void *a)
 {
-	uint8_t reg = *((uint8_t *)a);
-
-	if (reg == GM_MANUAL)
-	{
-		// FIXME: add ramps or pulses if needed
-		latch_dac0(protocol0.target);
-	}
-	else if (reg != GM_MANUAL && app_regs.REG_CHANNEL0_MODE != GM_MANUAL)
-	{
-		latch_dac0(0);
-		protocol0.ramps.previous_value = 0;
-	}
-
-	app_regs.REG_CHANNEL0_MODE = reg;
-	return true;
+    return channel_set_mode(0, *((uint8_t *)a));
 }
 
 /************************************************************************/
@@ -913,21 +655,7 @@ void app_read_REG_CHANNEL1_MODE(void) {}
 
 bool app_write_REG_CHANNEL1_MODE(void *a)
 {
-	uint8_t reg = *((uint8_t *)a);
-
-	if (reg == GM_MANUAL)
-	{
-		// FIXME: add ramps or pulses if needed
-		latch_dac1(protocol1.target);
-	}
-	else if (reg != GM_MANUAL && app_regs.REG_CHANNEL1_MODE != GM_MANUAL)
-	{
-		latch_dac1(0);
-		protocol1.ramps.previous_value = 0;
-	}
-
-	app_regs.REG_CHANNEL1_MODE = reg;
-	return true;
+    return channel_set_mode(1, *((uint8_t *)a));
 }
 
 /************************************************************************/

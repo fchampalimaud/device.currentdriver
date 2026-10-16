@@ -1,44 +1,69 @@
 #ifndef _STRUCTS_H_
-#define _STRUCTS_H
+#define _STRUCTS_H_
 
-typedef enum
-{
-    OFF,
-    DELAY,
-    RISE,
-    ON,
-    FALL
+#include <stdbool.h>
+#include <stdint.h>
+
+typedef enum {
+    WAVEFORM_LEVEL,
+    WAVEFORM_PULSE
+} WaveformKind;
+
+typedef struct {
+    bool rise_enabled;
+    bool fall_enabled;
+    uint16_t duration_ms;
+    bool rising;
+    uint16_t step;
+    uint32_t remainder;
+    uint32_t error;
+    uint32_t total_ticks;
+    uint32_t remaining_ticks;
+} RampState;
+
+typedef struct {
+    bool on;
+    uint16_t on_ticks;
+    uint16_t off_ticks;
+    uint16_t remaining_ticks;
+} PulseState;
+
+typedef struct {
+    WaveformKind kind;
+    uint16_t applied_value;
+    uint16_t target;
+    union {
+        RampState ramp;
+        PulseState pulse;
+    } waveform;
+} OutputState;
+
+typedef enum {
+    PROTOCOL_IDLE,
+    PROTOCOL_DELAY,
+    PROTOCOL_STARTING,
+    PROTOCOL_HOLD,
+    PROTOCOL_STOPPING
+} ProtocolPhase;
+
+typedef struct {
+    ProtocolPhase phase;
+    uint32_t delay_ticks;
+    uint32_t duration_ticks;
+    bool has_duration;
 } ProtocolState;
 
-typedef struct
-{
-    bool use_pulses;
-    bool state;
-    uint16_t time_on;
-    uint16_t time_off;
-    uint16_t countdown;
-} Pulses;
+typedef struct {
+    OutputState output;
+    ProtocolState protocol;
+} ChannelState;
 
-typedef struct
-{
-    uint8_t use_ramps;
-    uint16_t cycle_amount;
-    uint16_t remainder_rise;
-    uint16_t remainder_fall;
-    uint16_t previous_value;
-    uint16_t countdown_rise;
-    uint16_t countdown_fall;
-} Ramps;
+/* These entry points serialize state and DAC access against interrupts. */
+void channel_reset(uint8_t channel);
+void channel_apply_manual(uint8_t channel);
+void channel_start_protocol(uint8_t channel);
+void channel_stop_protocol(uint8_t channel);
+bool channel_set_mode(uint8_t channel, uint8_t mode);
+void channels_tick_500us(void);
 
-typedef struct
-{
-    ProtocolState state;
-    uint16_t delay;
-    uint16_t duration;
-    uint16_t target;
-    bool has_duration;
-    Pulses pulses;
-    Ramps ramps;
-} Protocol;
-
-#endif /* _STRUCT_H_ */
+#endif /* _STRUCTS_H_ */
