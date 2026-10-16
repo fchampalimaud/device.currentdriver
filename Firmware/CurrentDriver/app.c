@@ -31,8 +31,8 @@ void hwbp_app_initialize(void)
     /* Define versions */
     uint8_t hwH = 1;
     uint8_t hwL = 1;
-    uint8_t fwH = 0;
-    uint8_t fwL = 5;
+    uint8_t fwH = 1;
+    uint8_t fwL = 0;
     uint8_t ass = 0;
     
    	/* Start core */
@@ -110,7 +110,6 @@ void core_callback_reset_registers(void)
 	app_regs.REG_LED_ENABLE = 0;
 	app_regs.REG_LED_DISABLE = 0;
 	app_regs.REG_LED_OUT = 0;
-	app_regs.REG_LED_TARGET_STATE = 0;
 	app_regs.REG_LED0_CURRENT = 0;
 	app_regs.REG_LED1_CURRENT = 0;
 	app_regs.REG_LED0_MAX_CURRENT = 100;
@@ -131,9 +130,10 @@ void core_callback_reset_registers(void)
 	app_regs.REG_PROTOCOL1_DELAY = 0;
 	app_regs.REG_ENABLE_PROTOCOL = 0;
 	app_regs.REG_DISABLE_PROTOCOL = 0;
-	app_regs.REG_DI0_TRIGGER = 0;
-	app_regs.REG_DI1_TRIGGER = 0;
-	app_regs.REG_EVNT_ENABLE = B_EVT_LED_STATE | B_EVT_PORT_DIS;
+	app_regs.REG_CHANNEL0_MODE = 0;
+	app_regs.REG_CHANNEL1_MODE = 0;
+	app_regs.REG_CHANNEL_STATE = 0;
+	app_regs.REG_EVNT_ENABLE = B_EVT_PORT_DIS | B_EVT_CHANNEL_STATE;
 	
 }
 
@@ -241,8 +241,13 @@ void core_callback_t_500us(void)
 			latch_dac0(protocol0.ramps.previous_value);
 			protocol0.ramps.countdown_fall--;
 		} else {
-			latch_dac0(0);
-			protocol0.state = OFF;
+			if (app_regs.REG_CHANNEL0_MODE == GM_MANUAL) {
+				latch_dac0(protocol0.target);
+				protocol0.state = ON;
+			} else {
+				latch_dac0(0);
+				protocol0.state = OFF;
+			}
 		}
 	}
 
@@ -312,8 +317,13 @@ void core_callback_t_500us(void)
 			latch_dac1(protocol1.ramps.previous_value);
 			protocol1.ramps.countdown_fall--;
 		} else {
-			latch_dac1(0);
-			protocol1.state = OFF;
+			if (app_regs.REG_CHANNEL1_MODE == GM_MANUAL) {
+				latch_dac1(protocol1.target);
+				protocol1.state = ON;
+			} else {
+				latch_dac1(0);
+				protocol1.state = OFF;
+			}
 		}
 	}
 }

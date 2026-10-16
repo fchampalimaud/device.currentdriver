@@ -1,8 +1,13 @@
 #ifndef _STRUCTS_H_
 #define _STRUCTS_H
 
-typedef enum {
-    OFF, DELAY, RISE, ON, FALL
+typedef enum
+{
+    OFF,
+    DELAY,
+    RISE,
+    ON,
+    FALL
 } ProtocolState;
 
 typedef struct
@@ -35,6 +40,5 @@ typedef struct
     Pulses pulses;
     Ramps ramps;
 } Protocol;
-
 
 #endif /* _STRUCT_H_ */
