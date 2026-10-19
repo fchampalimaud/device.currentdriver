@@ -161,6 +161,7 @@ registers:
     address: 62
     type: U8
     access: Event
+    maskType: LedOutputs
     description: Sends an event when the channel reaches LOW and HIGH state
   Reserved0: &reserved
     address: 63

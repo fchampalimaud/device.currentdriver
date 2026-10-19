@@ -156,6 +156,11 @@ void output_begin(uint8_t channel, uint16_t target)
         else
         {
             output_write(channel, target);
+            if (target == 0)
+                app_regs.REG_CHANNEL_STATE &= ~(channel ? B_LED1 : B_LED0);
+            else
+                app_regs.REG_CHANNEL_STATE |= (channel ? B_LED1 : B_LED0);
+            core_func_send_event(ADD_REG_CHANNEL_STATE, true);
         }
     }
 }
@@ -180,6 +185,11 @@ void output_tick(uint8_t channel)
             pulse->on = !pulse->on;
             pulse->remaining_ticks = pulse->on ? pulse->on_ticks : pulse->off_ticks;
             output_write(channel, pulse->on ? output->target : 0);
+            if (pulse->on)
+                app_regs.REG_CHANNEL_STATE |= (channel ? B_LED1 : B_LED0);
+            else
+                app_regs.REG_CHANNEL_STATE &= ~(channel ? B_LED1 : B_LED0);
+            core_func_send_event(ADD_REG_CHANNEL_STATE, true);
         }
     }
     else
@@ -196,6 +206,16 @@ void output_tick(uint8_t channel)
             }
             --ramp->remaining_ticks;
             output_write(channel, ramp->remaining_ticks == 0 ? output->target : (ramp->rising ? output->applied_value + step : output->applied_value - step));
+            if (ramp->remaining_ticks == 0 && output->target == 0)
+            {
+                app_regs.REG_CHANNEL_STATE &= ~(channel ? B_LED1 : B_LED0);
+                core_func_send_event(ADD_REG_CHANNEL_STATE, true);
+            }
+            else if (ramp->remaining_ticks == 0 && !output->target == 0)
+            {
+                app_regs.REG_CHANNEL_STATE |= (channel ? B_LED1 : B_LED0);
+                core_func_send_event(ADD_REG_CHANNEL_STATE, true);
+            }
         }
     }
 }
