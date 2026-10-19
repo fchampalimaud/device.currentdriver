@@ -3485,9 +3485,9 @@ namespace Harp.CurrentDriver
         /// </summary>
         /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
         /// <returns>A value representing the message payload.</returns>
-        public static byte GetPayload(HarpMessage message)
+        public static LedOutputs GetPayload(HarpMessage message)
         {
-            return message.GetPayloadByte();
+            return (LedOutputs)message.GetPayloadByte();
         }
 
         /// <summary>
@@ -3495,9 +3495,10 @@ namespace Harp.CurrentDriver
         /// </summary>
         /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
         /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<byte> GetTimestampedPayload(HarpMessage message)
+        public static Timestamped<LedOutputs> GetTimestampedPayload(HarpMessage message)
         {
-            return message.GetTimestampedPayloadByte();
+            var payload = message.GetTimestampedPayloadByte();
+            return Timestamped.Create((LedOutputs)payload.Value, payload.Seconds);
         }
 
         /// <summary>
@@ -3509,9 +3510,9 @@ namespace Harp.CurrentDriver
         /// A <see cref="HarpMessage"/> object for the <see cref="ChannelState"/> register
         /// with the specified message type and payload.
         /// </returns>
-        public static HarpMessage FromPayload(MessageType messageType, byte value)
+        public static HarpMessage FromPayload(MessageType messageType, LedOutputs value)
         {
-            return HarpMessage.FromByte(Address, messageType, value);
+            return HarpMessage.FromByte(Address, messageType, (byte)value);
         }
 
         /// <summary>
@@ -3525,9 +3526,9 @@ namespace Harp.CurrentDriver
         /// A <see cref="HarpMessage"/> object for the <see cref="ChannelState"/> register
         /// with the specified message type, timestamp, and payload.
         /// </returns>
-        public static HarpMessage FromPayload(double timestamp, MessageType messageType, byte value)
+        public static HarpMessage FromPayload(double timestamp, MessageType messageType, LedOutputs value)
         {
-            return HarpMessage.FromByte(Address, timestamp, messageType, value);
+            return HarpMessage.FromByte(Address, timestamp, messageType, (byte)value);
         }
     }
 
@@ -3549,7 +3550,7 @@ namespace Harp.CurrentDriver
         /// </summary>
         /// <param name="message">A <see cref="HarpMessage"/> object representing the register message.</param>
         /// <returns>A value representing the timestamped message payload.</returns>
-        public static Timestamped<byte> GetPayload(HarpMessage message)
+        public static Timestamped<LedOutputs> GetPayload(HarpMessage message)
         {
             return ChannelState.GetTimestampedPayload(message);
         }
@@ -5532,13 +5533,13 @@ namespace Harp.CurrentDriver
         /// Gets or sets the value that sends an event when the channel reaches LOW and HIGH state.
         /// </summary>
         [Description("The value that sends an event when the channel reaches LOW and HIGH state.")]
-        public byte ChannelState { get; set; }
+        public LedOutputs ChannelState { get; set; }
 
         /// <summary>
         /// Creates a message payload for the ChannelState register.
         /// </summary>
         /// <returns>The created message payload value.</returns>
-        public byte GetPayload()
+        public LedOutputs GetPayload()
         {
             return ChannelState;
         }

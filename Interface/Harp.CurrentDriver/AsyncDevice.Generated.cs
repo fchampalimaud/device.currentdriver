@@ -1424,7 +1424,7 @@ namespace Harp.CurrentDriver
         /// A task that represents the asynchronous read operation. The task result contains
         /// the register payload.
         /// </returns>
-        public async Task<byte> ReadChannelStateAsync(CancellationToken cancellationToken = default)
+        public async Task<LedOutputs> ReadChannelStateAsync(CancellationToken cancellationToken = default)
         {
             var reply = await CommandAsync(HarpCommand.ReadByte(ChannelState.Address), cancellationToken);
             return ChannelState.GetPayload(reply);
@@ -1440,7 +1440,7 @@ namespace Harp.CurrentDriver
         /// A task that represents the asynchronous read operation. The task result contains
         /// the timestamped register payload.
         /// </returns>
-        public async Task<Timestamped<byte>> ReadTimestampedChannelStateAsync(CancellationToken cancellationToken = default)
+        public async Task<Timestamped<LedOutputs>> ReadTimestampedChannelStateAsync(CancellationToken cancellationToken = default)
         {
             var reply = await CommandAsync(HarpCommand.ReadByte(ChannelState.Address), cancellationToken);
             return ChannelState.GetTimestampedPayload(reply);
