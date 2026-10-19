@@ -3,7 +3,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/protocol/refs/heads/main/schema/device.json
 device: CurrentDriver
 whoAmI: 1282
-firmwareVersion: "0.5"
+firmwareVersion: "1.0"
 hardwareTargets: "1.1"
 registers:
   DigitalInputState:
@@ -218,7 +218,23 @@ groupMasks:
   ChannelMode:
     description: Specifies the mode of operation of a channel
     values:
-      Manual: {value: 0, description: The voltage/current changes when the user sets a new value}
-      Protocol: {value: 1, description: The protocol settings must be defined beforehand and triggered in software}
-      StartProtocolTrigger: {value: 2, description: The protocol settings must be defined beforehand and triggered in hardware when the respective DI state changes from LOW to HIGH}
-      StartAndStopProtocolTrigger: {value: 3, description: The protocol starts when the respective DI state changes from LOW to HIGH and ends when it changes from HIGH to LOW}
+      Manual:
+        {
+          value: 0,
+          description: The voltage/current changes when the user sets a new value,
+        }
+      Protocol:
+        {
+          value: 1,
+          description: The protocol settings must be defined beforehand and triggered in software,
+        }
+      StartProtocolTrigger:
+        {
+          value: 2,
+          description: The protocol settings must be defined beforehand and triggered in hardware when the respective DI state changes from LOW to HIGH,
+        }
+      StartAndStopProtocolTrigger:
+        {
+          value: 3,
+          description: The protocol starts when the respective DI state changes from LOW to HIGH and ends when it changes from HIGH to LOW,
+        }
