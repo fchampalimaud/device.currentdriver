@@ -5,8 +5,7 @@
 #define F_CPU 32000000
 #include <util/delay.h>
 
-#include "structs.h"
-
+#include "utils.h"
 
 /************************************************************************/
 /* Create pointers to functions                                         */
@@ -14,31 +13,33 @@
 extern AppRegs app_regs;
 
 /* Current and voltage writes share validation, conversion and execution. */
-static bool channel_write_setpoint(uint8_t channel, float value, bool current)
+bool channel_write_setpoint(uint8_t channel, float value, bool current)
 {
-    float max_current = channel ? app_regs.REG_LED1_MAX_CURRENT : app_regs.REG_LED0_MAX_CURRENT;
-    bool driver_enabled = channel ? !read_I_OFF_DAC1 : !read_I_OFF_DAC0;
-    float voltage;
-    uint8_t mode = channel ? app_regs.REG_CHANNEL1_MODE : app_regs.REG_CHANNEL0_MODE;
+	float max_current = channel ? app_regs.REG_LED1_MAX_CURRENT : app_regs.REG_LED0_MAX_CURRENT;
+	bool driver_enabled = channel ? !read_I_OFF_DAC1 : !read_I_OFF_DAC0;
+	float voltage;
+	uint8_t mode = channel ? app_regs.REG_CHANNEL1_MODE : app_regs.REG_CHANNEL0_MODE;
 
-    /* Ordered comparisons also reject NaN and infinities. */
-    if (!(value >= 0 && value <= (current ? 500.0f : 5000.0f)))
-        return false;
-    voltage = current ? value * 10.0f : value;
-    if ((current || driver_enabled) && voltage / 10.0f > max_current)
-        return false;
-    if (channel) {
-        app_regs.REG_LED1_CURRENT = voltage / 10.0f;
-        app_regs.REG_DAC1_VOLTAGE = voltage;
-    } else {
-        app_regs.REG_LED0_CURRENT = voltage / 10.0f;
-        app_regs.REG_DAC0_VOLTAGE = voltage;
-    }
-    if (mode == GM_MANUAL)
-        channel_apply_manual(channel);
-    return true;
+	/* Ordered comparisons also reject NaN and infinities. */
+	if (!(value >= 0 && value <= (current ? 500.0f : 5000.0f)))
+		return false;
+	voltage = current ? value * 10.0f : value;
+	if ((current || driver_enabled) && voltage / 10.0f > max_current)
+		return false;
+	if (channel)
+	{
+		app_regs.REG_LED1_CURRENT = voltage / 10.0f;
+		app_regs.REG_DAC1_VOLTAGE = voltage;
+	}
+	else
+	{
+		app_regs.REG_LED0_CURRENT = voltage / 10.0f;
+		app_regs.REG_DAC0_VOLTAGE = voltage;
+	}
+	if (mode == GM_MANUAL)
+		channel_apply_manual(channel);
+	return true;
 }
-
 
 void (*app_func_rd_pointer[])(void) = {
 	&app_read_REG_PORT_DIS,
@@ -356,7 +357,7 @@ bool app_write_REG_LED_OUT(void *a)
 void app_read_REG_LED0_CURRENT(void) {}
 bool app_write_REG_LED0_CURRENT(void *a)
 {
-    return channel_write_setpoint(0, *((float *)a), true);
+	return channel_write_setpoint(0, *((float *)a), true);
 }
 
 /************************************************************************/
@@ -365,7 +366,7 @@ bool app_write_REG_LED0_CURRENT(void *a)
 void app_read_REG_LED1_CURRENT(void) {}
 bool app_write_REG_LED1_CURRENT(void *a)
 {
-    return channel_write_setpoint(1, *((float *)a), true);
+	return channel_write_setpoint(1, *((float *)a), true);
 }
 
 /************************************************************************/
@@ -422,7 +423,7 @@ bool app_write_REG_LED1_MAX_CURRENT(void *a)
 void app_read_REG_DAC0_VOLTAGE(void) {}
 bool app_write_REG_DAC0_VOLTAGE(void *a)
 {
-    return channel_write_setpoint(0, *((float *)a), false);
+	return channel_write_setpoint(0, *((float *)a), false);
 }
 
 /************************************************************************/
@@ -431,7 +432,7 @@ bool app_write_REG_DAC0_VOLTAGE(void *a)
 void app_read_REG_DAC1_VOLTAGE(void) {}
 bool app_write_REG_DAC1_VOLTAGE(void *a)
 {
-    return channel_write_setpoint(1, *((float *)a), false);
+	return channel_write_setpoint(1, *((float *)a), false);
 }
 
 /************************************************************************/
@@ -614,13 +615,13 @@ bool app_write_REG_PROTOCOL1_DELAY(void *a)
 void app_read_REG_ENABLE_PROTOCOL(void) {}
 bool app_write_REG_ENABLE_PROTOCOL(void *a)
 {
-    uint8_t reg = *((uint8_t *)a);
-    if ((reg & B_LED0) && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
-        channel_start_protocol(0);
-    if ((reg & B_LED1) && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
-        channel_start_protocol(1);
-    app_regs.REG_ENABLE_PROTOCOL = reg;
-    return true;
+	uint8_t reg = *((uint8_t *)a);
+	if ((reg & B_LED0) && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
+		channel_start_protocol(0);
+	if ((reg & B_LED1) && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
+		channel_start_protocol(1);
+	app_regs.REG_ENABLE_PROTOCOL = reg;
+	return true;
 }
 
 /************************************************************************/
@@ -629,13 +630,13 @@ bool app_write_REG_ENABLE_PROTOCOL(void *a)
 void app_read_REG_DISABLE_PROTOCOL(void) {}
 bool app_write_REG_DISABLE_PROTOCOL(void *a)
 {
-    uint8_t reg = *((uint8_t *)a);
-    if ((reg & B_LED0) && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
-        channel_stop_protocol(0);
-    if ((reg & B_LED1) && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
-        channel_stop_protocol(1);
-    app_regs.REG_DISABLE_PROTOCOL = reg;
-    return true;
+	uint8_t reg = *((uint8_t *)a);
+	if ((reg & B_LED0) && app_regs.REG_CHANNEL0_MODE == GM_PROTOCOL)
+		channel_stop_protocol(0);
+	if ((reg & B_LED1) && app_regs.REG_CHANNEL1_MODE == GM_PROTOCOL)
+		channel_stop_protocol(1);
+	app_regs.REG_DISABLE_PROTOCOL = reg;
+	return true;
 }
 
 /************************************************************************/
@@ -645,7 +646,7 @@ void app_read_REG_CHANNEL0_MODE(void) {}
 
 bool app_write_REG_CHANNEL0_MODE(void *a)
 {
-    return channel_set_mode(0, *((uint8_t *)a));
+	return channel_set_mode(0, *((uint8_t *)a));
 }
 
 /************************************************************************/
@@ -655,7 +656,7 @@ void app_read_REG_CHANNEL1_MODE(void) {}
 
 bool app_write_REG_CHANNEL1_MODE(void *a)
 {
-    return channel_set_mode(1, *((uint8_t *)a));
+	return channel_set_mode(1, *((uint8_t *)a));
 }
 
 /************************************************************************/

@@ -2,18 +2,17 @@
 #define _APP_FUNCTIONS_H_
 #include <avr/io.h>
 
-
 /************************************************************************/
 /* Define if not defined                                                */
 /************************************************************************/
 #ifndef bool
-	#define bool uint8_t
+#define bool uint8_t
 #endif
 #ifndef true
-	#define true 1
+#define true 1
 #endif
 #ifndef false
-	#define false 0
+#define false 0
 #endif
 
 void latch_dac0(uint16_t word);
@@ -97,6 +96,5 @@ bool app_write_REG_RESERVED2(void *a);
 bool app_write_REG_RESERVED3(void *a);
 bool app_write_REG_RESERVED4(void *a);
 bool app_write_REG_EVNT_ENABLE(void *a);
-
 
 #endif /* _APP_FUNCTIONS_H_ */

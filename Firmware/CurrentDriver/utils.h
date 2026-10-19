@@ -1,15 +1,18 @@
 #ifndef _STRUCTS_H_
 #define _STRUCTS_H_
 
-#include <stdbool.h>
-#include <stdint.h>
+#include <util/atomic.h>
 
-typedef enum {
+#include "app_ios_and_regs.h"
+
+typedef enum
+{
     WAVEFORM_LEVEL,
     WAVEFORM_PULSE
 } WaveformKind;
 
-typedef struct {
+typedef struct
+{
     bool rise_enabled;
     bool fall_enabled;
     uint16_t duration_ms;
@@ -21,24 +24,28 @@ typedef struct {
     uint32_t remaining_ticks;
 } RampState;
 
-typedef struct {
+typedef struct
+{
     bool on;
     uint16_t on_ticks;
     uint16_t off_ticks;
     uint16_t remaining_ticks;
 } PulseState;
 
-typedef struct {
+typedef struct
+{
     WaveformKind kind;
     uint16_t applied_value;
     uint16_t target;
-    union {
+    union
+    {
         RampState ramp;
         PulseState pulse;
     } waveform;
 } OutputState;
 
-typedef enum {
+typedef enum
+{
     PROTOCOL_IDLE,
     PROTOCOL_DELAY,
     PROTOCOL_STARTING,
@@ -46,19 +53,22 @@ typedef enum {
     PROTOCOL_STOPPING
 } ProtocolPhase;
 
-typedef struct {
+typedef struct
+{
     ProtocolPhase phase;
     uint32_t delay_ticks;
     uint32_t duration_ticks;
     bool has_duration;
 } ProtocolState;
 
-typedef struct {
+typedef struct
+{
     OutputState output;
     ProtocolState protocol;
 } ChannelState;
 
 /* These entry points serialize state and DAC access against interrupts. */
+bool channel_write_setpoint(uint8_t channel, float value, bool current);
 void channel_reset(uint8_t channel);
 void channel_apply_manual(uint8_t channel);
 void channel_start_protocol(uint8_t channel);
