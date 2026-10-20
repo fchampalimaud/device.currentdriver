@@ -2,8 +2,8 @@
 #define _APP_H_
 #include <avr/io.h>
 
-#define HW_MAJOR 1
-#define HW_MINOR 1
+#define HW_MAJOR 2
+#define HW_MINOR 0
 
 /************************************************************************/
 /* Enable the interrupts                                                */
