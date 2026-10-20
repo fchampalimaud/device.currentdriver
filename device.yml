@@ -3,7 +3,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/harp-tech/protocol/refs/heads/main/schema/device.json
 device: CurrentDriver
 whoAmI: 1282
-firmwareVersion: "0.4"
+firmwareVersion: "1.0"
 hardwareTargets: "1.1"
 registers:
   DigitalInputState:
@@ -14,7 +14,7 @@ registers:
     description: Reflects the state of DI digital lines
   OutputSet: &output
     address: 33
-    type: U16
+    type: U8
     access: Write
     maskType: DigitalOutputs
     description: Set the specified digital output lines
@@ -30,19 +30,44 @@ registers:
     <<: *output
     address: 36
     description: Write the state of all digital output lines
-  Led0Current: &ledCurrent
+  LedEnable: &led
     address: 37
+    type: U8
+    access: Write
+    maskType: LedOutputs
+    description: Enable driver on the selected output
+  LedDisable:
+    <<: *led
+    address: 38
+    description: Disable driver on the selected output
+  LedState:
+    <<: *led
+    address: 39
+    description: Control the respective LED output
+  Led0Current: &ledCurrent
+    address: 40
     type: Float
     access: Write
     minValue: 0
-    maxValue: 1000
-    description: Configuration of current to drive LED 0 [0:500] mA
+    maxValue: 500
+    description: Configuration of current to drive LED 0 [0:1000] mA
   Led1Current:
     <<: *ledCurrent
-    address: 38
-    description: Configuration of current to drive LED 1 [0:500] mA
+    address: 41
+    description: Configuration of current to drive LED 1 [0:1000] mA
+  Led0MaxCurrent: &ledMaxCurrent
+    address: 42
+    type: Float
+    access: Write
+    minValue: 0
+    maxValue: 500
+    description: Configuration of current to drive LED 0 [0:1000] mA
+  Led1MaxCurrent:
+    <<: *ledMaxCurrent
+    address: 43
+    description: Configuration of current to drive LED 1 [0:1000] mA
   Dac0Voltage: &dacVoltage
-    address: 39
+    address: 44
     type: Float
     access: Write
     minValue: 0
@@ -50,33 +75,8 @@ registers:
     description: Configuration of DAC 0 voltage [0:5000] mV
   Dac1Voltage:
     <<: *dacVoltage
-    address: 40
-    description: Configuration of DAC 1 voltage [0:5000] mV
-  LedEnable: &led
-    address: 41
-    type: U8
-    access: Write
-    maskType: LedOutputs
-    description: Enable driver on the selected output
-  LedDisable:
-    <<: *led
-    address: 42
-    description: Disable driver on the selected output
-  LedState:
-    <<: *led
-    address: 43
-    description: Control the correspondent LED output
-  Led0MaxCurrent: &ledMaxCurrent
-    address: 44
-    type: Float
-    access: Write
-    minValue: 0
-    maxValue: 1000
-    description: Configuration of current to drive LED 0 [0:500] mA
-  Led1MaxCurrent:
-    <<: *ledMaxCurrent
     address: 45
-    description: Configuration of current to drive LED 1 [0:500] mA
+    description: Configuration of DAC 1 voltage [0:5000] mV
   PulseEnable:
     address: 46
     type: U8
@@ -120,23 +120,69 @@ registers:
     access: Write
     maskType: LedRamps
     description: Specifies when the ramps are applied for each DAC/LED
-  Reserved0: &reserved
+  Protocol0Duration: &protocolDuration
     address: 54
+    type: U16
+    access: Write
+    description: Specifies the duration of LED0 protocol
+  Protocol1Duration:
+    <<: *protocolDuration
+    address: 55
+    description: Specifies the duration of LED1 protocol
+  Protocol0Delay: &protocolDelay
+    address: 56
+    type: U16
+    access: Write
+    description: Specifies the delay of the LED0 protocol
+  Protocol1Delay:
+    <<: *protocolDelay
+    address: 57
+  EnableProtocol: &protocol
+    address: 58
+    type: U8
+    access: Write
+    maskType: LedOutputs
+    description: Enable the respective protocol
+  DisableProtocol:
+    <<: *protocol
+    address: 59
+    description: Disable the respective protocol
+  Channel0Mode: &channelMode
+    address: 60
+    type: U8
+    access: Write
+    maskType: ChannelMode
+    description: Configures the mode of operation of channel 0
+  Channel1Mode:
+    <<: *channelMode
+    address: 61
+    description: Configures the mode of operation of channel 1
+  ChannelState:
+    address: 62
+    type: U8
+    access: Event
+    maskType: LedOutputs
+    description: Sends an event when the channel reaches LOW and HIGH state
+  Reserved0: &reserved
+    address: 63
     access: Read
     visibility: private
     type: U8
     description: Reserved
   Reserved1:
     <<: *reserved
-    address: 55
+    address: 64
   Reserved2:
     <<: *reserved
-    address: 56
+    address: 65
   Reserved3:
     <<: *reserved
-    address: 57
+    address: 66
+  Reserved4:
+    <<: *reserved
+    address: 67
   EnableEvents:
-    address: 58
+    address: 68
     access: Write
     type: U8
     maskType: CurrentDriverEvents
@@ -155,16 +201,41 @@ bitMasks:
   LedOutputs:
     description: Specifies the state of LED driver's outputs
     bits:
-      LED0: 0x1
-      LED1: 0x2
+      Led0: 0x1
+      Led1: 0x2
   LedRamps:
     description: Specifies the configuration of LED driver's ramps
     bits:
-      LED0_UP: 0x1
-      LED0_DOWN: 0x2
-      LED1_UP: 0x4
-      LED1_DOWN: 0x8
+      Led0Rise: 0x1
+      Led0Fall: 0x2
+      Led1Rise: 0x4
+      Led1Fall: 0x8
   CurrentDriverEvents:
-    description: Specifies the active events in the device.
+    description: Specifies the active events in the device
     bits:
       DIs: 0x1
+      ChannelState: 0x2
+groupMasks:
+  ChannelMode:
+    description: Specifies the mode of operation of a channel
+    values:
+      Manual:
+        {
+          value: 0,
+          description: The voltage/current changes when the user sets a new value,
+        }
+      Protocol:
+        {
+          value: 1,
+          description: The protocol settings must be defined beforehand and triggered in software,
+        }
+      StartProtocolTrigger:
+        {
+          value: 2,
+          description: The protocol settings must be defined beforehand and triggered in hardware when the respective DI state changes from LOW to HIGH,
+        }
+      StartAndStopProtocolTrigger:
+        {
+          value: 3,
+          description: The protocol starts when the respective DI state changes from LOW to HIGH and ends when it changes from HIGH to LOW,
+        }
