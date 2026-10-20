@@ -4,7 +4,7 @@
 device: CurrentDriver
 whoAmI: 1282
 firmwareVersion: "1.0"
-hardwareTargets: "1.1"
+hardwareTargets: "2.0"
 registers:
   DigitalInputState:
     address: 32
