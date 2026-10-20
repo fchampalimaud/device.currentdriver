@@ -28,7 +28,7 @@ static const uint8_t default_device_name[] = "CurrentDriver";
 void hwbp_app_initialize(void)
 {
     /* Define versions */
-    uint8_t hwH = 1;
+    uint8_t hwH = 2;
     uint8_t hwL = 1;
     uint8_t hwP = 0;
     uint8_t fwH = 1;
