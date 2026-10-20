@@ -1,6 +1,7 @@
 #ifndef _APP_IOS_AND_REGS_H_
 #define _APP_IOS_AND_REGS_H_
 #include "cpu.h"
+#include "app.h"
 
 void init_ios(void);
 /************************************************************************/
@@ -12,11 +13,11 @@ void init_ios(void);
 // MISO                   Description: MISO
 // DI1                    Description: Digital input 1
 
-#define read_DI0 read_io(PORTB, 0)              // DI0
-#define read_HOLD0 read_io(PORTD, 0)            // HOLD0
-#define read_HOLD1 read_io(PORTD, 1)            // HOLD1
-#define read_MISO read_io(PORTD, 6)             // MISO
-#define read_DI1 read_io(PORTH, 0)              // DI1
+#define read_DI0 read_io(PORTB, 0)	 // DI0
+#define read_HOLD0 read_io(PORTD, 0) // HOLD0
+#define read_HOLD1 read_io(PORTD, 1) // HOLD1
+#define read_MISO read_io(PORTD, 6)	 // MISO
+#define read_DI1 read_io(PORTH, 0)	 // DI1
 
 /************************************************************************/
 /* Definition of output pins                                            */
@@ -33,16 +34,30 @@ void init_ios(void);
 // DO0                    Description: Output DO0
 
 /* I_OFF_DAC0 */
+#if HW_MAJOR == 1
+#define set_I_OFF_DAC0 set_io(PORTB, 5)
+#define clr_I_OFF_DAC0 clear_io(PORTB, 5)
+#define tgl_I_OFF_DAC0 toggle_io(PORTB, 5)
+#define read_I_OFF_DAC0 read_io(PORTB, 5)
+#else
 #define set_I_OFF_DAC0 set_io(PORTH, 2)
 #define clr_I_OFF_DAC0 clear_io(PORTH, 2)
 #define tgl_I_OFF_DAC0 toggle_io(PORTH, 2)
 #define read_I_OFF_DAC0 read_io(PORTH, 2)
+#endif
 
 /* I_OFF_DAC1 */
+#if HW_MAJOR == 1
+#define set_I_OFF_DAC1 set_io(PORTB, 6)
+#define clr_I_OFF_DAC1 clear_io(PORTB, 6)
+#define tgl_I_OFF_DAC1 toggle_io(PORTB, 6)
+#define read_I_OFF_DAC1 read_io(PORTB, 6)
+#else
 #define set_I_OFF_DAC1 set_io(PORTH, 5)
 #define clr_I_OFF_DAC1 clear_io(PORTH, 5)
 #define tgl_I_OFF_DAC1 toggle_io(PORTH, 5)
 #define read_I_OFF_DAC1 read_io(PORTH, 5)
+#endif
 
 /* CE1 */
 #define set_CE1 set_io(PORTD, 3)
@@ -92,7 +107,6 @@ void init_ios(void);
 #define tgl_DO0 toggle_io(PORTF, 0)
 #define read_DO0 read_io(PORTF, 0)
 
-
 /************************************************************************/
 /* Registers' structure                                                 */
 /************************************************************************/
@@ -141,43 +155,43 @@ typedef struct
 /* Registers' address                                                   */
 /************************************************************************/
 /* Registers */
-#define ADD_REG_PORT_DIS                    32 // U8     Reflects the state of DI digital lines of each Port
-#define ADD_REG_OUTPUTS_SET                 33 // U8     Set the correspondent output
-#define ADD_REG_OUTPUTS_CLEAR               34 // U8     Clear the correspondent output
-#define ADD_REG_OUTPUTS_TOGGLE              35 // U8     Toggle the correspondent output
-#define ADD_REG_OUTPUTS_OUT                 36 // U8     Control the correspondent output
-#define ADD_REG_LED_ENABLE                  37 // U8     Enable driver on the selected output
-#define ADD_REG_LED_DISABLE                 38 // U8     Disable driver on the selected output
-#define ADD_REG_LED_OUT                     39 // U8     Control the correspondent LED output
-#define ADD_REG_LED0_CURRENT                40 // FLOAT  Configuration of current to drive LED 0 [0:1000] mA
-#define ADD_REG_LED1_CURRENT                41 // FLOAT  Configuration of current to drive LED 1 [0:1000] mA
-#define ADD_REG_LED0_MAX_CURRENT            42 // FLOAT  Configuration of current to drive LED 0 [0:1000] mA
-#define ADD_REG_LED1_MAX_CURRENT            43 // FLOAT  Configuration of current to drive LED 1 [0:1000] mA
-#define ADD_REG_DAC0_VOLTAGE                44 // FLOAT  Configuration of DAC 0 voltage [0:5000] mV
-#define ADD_REG_DAC1_VOLTAGE                45 // FLOAT  Configuration of DAC 1 voltage [0:5000] mV
-#define ADD_REG_PULSE_ENABLE                46 // U8     Enables the pulse function for the specified output DACs/LEDs.
-#define ADD_REG_PULSE_DCYCLE_LED0           47 // U8     Specifies the duty cycle of the output pulse from 1 to 100.
-#define ADD_REG_PULSE_DCYCLE_LED1           48 // U8     Specifies the duty cycle of the output pulse from 1 to 100.
-#define ADD_REG_PULSE_FREQUENCY_LED0        49 // U8     Specifies the frequency of the output pulse in Hz.
-#define ADD_REG_PULSE_FREQUENCY_LED1        50 // U8     Specifies the frequency of the output pulse in Hz.
-#define ADD_REG_RAMP_LED0                   51 // U16    Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off.
-#define ADD_REG_RAMP_LED1                   52 // U16    Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off.
-#define ADD_REG_RAMP_CONFIG                 53 // U8     Specifies when the ramps are applied for each DAC/LED.
-#define ADD_REG_PROTOCOL0_DURATION          54 // U16    Specifies the duration of LED0 protocol
-#define ADD_REG_PROTOCOL1_DURATION          55 // U16    Specifies the duration of LED1 protocol
-#define ADD_REG_PROTOCOL0_DELAY             56 // U16    Specifies the delay of the LED0 protocol
-#define ADD_REG_PROTOCOL1_DELAY             57 // U16    Specifies the delay of the LED1 protocol
-#define ADD_REG_ENABLE_PROTOCOL             58 // U8     Enable the correspondent protocol
-#define ADD_REG_DISABLE_PROTOCOL            59 // U8     Disables the correspondent protocol
-#define ADD_REG_CHANNEL0_MODE               60 // U8     Configures the callback function triggered when DI0 is triggered
-#define ADD_REG_CHANNEL1_MODE               61 // U8     Configures the callback function triggered when DI1 is triggered
-#define ADD_REG_CHANNEL_STATE               62 // U8     Sends an event when the LED reaches the target value
-#define ADD_REG_RESERVED0                   63 // U8     Reserved for future use
-#define ADD_REG_RESERVED1                   64 // U8     Reserved for future use
-#define ADD_REG_RESERVED2                   65 // U8     Reserved for future use
-#define ADD_REG_RESERVED3                   66 // U8     Reserved for future use
-#define ADD_REG_RESERVED4                   67 // U8     Reserved for future use
-#define ADD_REG_EVNT_ENABLE                 68 // U8     Enable the Events
+#define ADD_REG_PORT_DIS 32				// U8     Reflects the state of DI digital lines of each Port
+#define ADD_REG_OUTPUTS_SET 33			// U8     Set the correspondent output
+#define ADD_REG_OUTPUTS_CLEAR 34		// U8     Clear the correspondent output
+#define ADD_REG_OUTPUTS_TOGGLE 35		// U8     Toggle the correspondent output
+#define ADD_REG_OUTPUTS_OUT 36			// U8     Control the correspondent output
+#define ADD_REG_LED_ENABLE 37			// U8     Enable driver on the selected output
+#define ADD_REG_LED_DISABLE 38			// U8     Disable driver on the selected output
+#define ADD_REG_LED_OUT 39				// U8     Control the correspondent LED output
+#define ADD_REG_LED0_CURRENT 40			// FLOAT  Configuration of current to drive LED 0 [0:1000] mA
+#define ADD_REG_LED1_CURRENT 41			// FLOAT  Configuration of current to drive LED 1 [0:1000] mA
+#define ADD_REG_LED0_MAX_CURRENT 42		// FLOAT  Configuration of current to drive LED 0 [0:1000] mA
+#define ADD_REG_LED1_MAX_CURRENT 43		// FLOAT  Configuration of current to drive LED 1 [0:1000] mA
+#define ADD_REG_DAC0_VOLTAGE 44			// FLOAT  Configuration of DAC 0 voltage [0:5000] mV
+#define ADD_REG_DAC1_VOLTAGE 45			// FLOAT  Configuration of DAC 1 voltage [0:5000] mV
+#define ADD_REG_PULSE_ENABLE 46			// U8     Enables the pulse function for the specified output DACs/LEDs.
+#define ADD_REG_PULSE_DCYCLE_LED0 47	// U8     Specifies the duty cycle of the output pulse from 1 to 100.
+#define ADD_REG_PULSE_DCYCLE_LED1 48	// U8     Specifies the duty cycle of the output pulse from 1 to 100.
+#define ADD_REG_PULSE_FREQUENCY_LED0 49 // U8     Specifies the frequency of the output pulse in Hz.
+#define ADD_REG_PULSE_FREQUENCY_LED1 50 // U8     Specifies the frequency of the output pulse in Hz.
+#define ADD_REG_RAMP_LED0 51			// U16    Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off.
+#define ADD_REG_RAMP_LED1 52			// U16    Specifies the ramp time of the transitions between different current/voltage values in milliseconds. The ramp will only work if the pulse function is off.
+#define ADD_REG_RAMP_CONFIG 53			// U8     Specifies when the ramps are applied for each DAC/LED.
+#define ADD_REG_PROTOCOL0_DURATION 54	// U16    Specifies the duration of LED0 protocol
+#define ADD_REG_PROTOCOL1_DURATION 55	// U16    Specifies the duration of LED1 protocol
+#define ADD_REG_PROTOCOL0_DELAY 56		// U16    Specifies the delay of the LED0 protocol
+#define ADD_REG_PROTOCOL1_DELAY 57		// U16    Specifies the delay of the LED1 protocol
+#define ADD_REG_ENABLE_PROTOCOL 58		// U8     Enable the correspondent protocol
+#define ADD_REG_DISABLE_PROTOCOL 59		// U8     Disables the correspondent protocol
+#define ADD_REG_CHANNEL0_MODE 60		// U8     Configures the callback function triggered when DI0 is triggered
+#define ADD_REG_CHANNEL1_MODE 61		// U8     Configures the callback function triggered when DI1 is triggered
+#define ADD_REG_CHANNEL_STATE 62		// U8     Sends an event when the LED reaches the target value
+#define ADD_REG_RESERVED0 63			// U8     Reserved for future use
+#define ADD_REG_RESERVED1 64			// U8     Reserved for future use
+#define ADD_REG_RESERVED2 65			// U8     Reserved for future use
+#define ADD_REG_RESERVED3 66			// U8     Reserved for future use
+#define ADD_REG_RESERVED4 67			// U8     Reserved for future use
+#define ADD_REG_EVNT_ENABLE 68			// U8     Enable the Events
 
 /************************************************************************/
 /* PWM Generator registers' memory limits                               */
@@ -186,28 +200,28 @@ typedef struct
 /* DON'T change these names !!!                                         */
 /************************************************************************/
 /* Memory limits */
-#define APP_REGS_ADD_MIN                    0x20
-#define APP_REGS_ADD_MAX                    0x44
-#define APP_NBYTES_OF_REG_BANK              61
+#define APP_REGS_ADD_MIN 0x20
+#define APP_REGS_ADD_MAX 0x44
+#define APP_NBYTES_OF_REG_BANK 61
 
 /************************************************************************/
 /* Registers' bits                                                      */
 /************************************************************************/
-#define B_DI0                              (1<<0)       // Digital input 0
-#define B_DI1                              (1<<1)       // Digital input 1
-#define B_DO0                              (1<<0)       // Digital output 0
-#define B_DO1                              (1<<1)       // Digital output 1
-#define B_LED0                             (1<<0)       // 
-#define B_LED1                             (1<<1)       // 
-#define B_LED0_RISE                        (1<<0)       // 
-#define B_LED0_FALL                        (1<<1)       // 
-#define B_LED1_RISE                        (1<<2)       // 
-#define B_LED1_FALL                        (1<<3)       // 
-#define GM_MANUAL                          (0<<0)       // The voltage/current changes when the user sets a new value
-#define GM_PROTOCOL                        (1<<0)       // The protocol settings must be defined beforehand and triggered in software
-#define GM_START_PROTOCOL_TRIGGER          (2<<0)       // The protocol settings must be defined beforehand and triggered in hardware when the respective DI state changes from LOW to HIGH
-#define GM_START_AND_STOP_PROTOCOL_TRIGGER (3<<0)       // The protocol starts when the respective DI state changes from LOW to HIGH and ends when it changes from HIGH to LOW
-#define B_EVT_PORT_DIS                     (1<<0)       // Event of register DIs
-#define B_EVT_CHANNEL_STATE                (1<<1)       // Event of the state of the LEDs
+#define B_DI0 (1 << 0)								// Digital input 0
+#define B_DI1 (1 << 1)								// Digital input 1
+#define B_DO0 (1 << 0)								// Digital output 0
+#define B_DO1 (1 << 1)								// Digital output 1
+#define B_LED0 (1 << 0)								//
+#define B_LED1 (1 << 1)								//
+#define B_LED0_RISE (1 << 0)						//
+#define B_LED0_FALL (1 << 1)						//
+#define B_LED1_RISE (1 << 2)						//
+#define B_LED1_FALL (1 << 3)						//
+#define GM_MANUAL (0 << 0)							// The voltage/current changes when the user sets a new value
+#define GM_PROTOCOL (1 << 0)						// The protocol settings must be defined beforehand and triggered in software
+#define GM_START_PROTOCOL_TRIGGER (2 << 0)			// The protocol settings must be defined beforehand and triggered in hardware when the respective DI state changes from LOW to HIGH
+#define GM_START_AND_STOP_PROTOCOL_TRIGGER (3 << 0) // The protocol starts when the respective DI state changes from LOW to HIGH and ends when it changes from HIGH to LOW
+#define B_EVT_PORT_DIS (1 << 0)						// Event of register DIs
+#define B_EVT_CHANNEL_STATE (1 << 1)				// Event of the state of the LEDs
 
 #endif /* _APP_REGS_H_ */
